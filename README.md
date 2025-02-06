@@ -19,4 +19,5 @@ Repository for group 12's 2024/25 academic year COMP5530M group project on infla
 - set upstream - git push --set-upstream origin <branchname>
 - git add .
 - git commit -m "message"
+- git push
 - Make pull request in git and get someone to review changes.
