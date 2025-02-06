@@ -57,7 +57,6 @@ X_test, y_test   = create_sequences(test_series, sequence_length)
 print(f"Training sequences: {X_train.shape}, Training targets: {y_train.shape}")
 print(f"Testing sequences: {X_test.shape}, Testing targets: {y_test.shape}")
 
-# The LSTM expects input of shape [batch, seq_length, input_size]. Here, input_size = 1.
 X_train_tensor = torch.tensor(X_train, dtype=torch.float32).unsqueeze(-1)
 y_train_tensor = torch.tensor(y_train, dtype=torch.float32).unsqueeze(-1)
 X_test_tensor  = torch.tensor(X_test, dtype=torch.float32).unsqueeze(-1)
