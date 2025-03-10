@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 from statsmodels.tsa.stattools import grangercausalitytests, adfuller
 import pandas as pd
 
-#
 def round_to_year(dt : datetime) -> datetime:
     '''
     Rounds datetime up or down to the nearest year.
@@ -22,7 +21,6 @@ def round_to_year(dt : datetime) -> datetime:
         leap = False
     return dt.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0) + timedelta(days=365+leap if dt.month >= 7 else 0)
 
-#
 def getTestDate(testRatio : float, startYear : int, endYear : int, verbose=False) -> str:
     '''
     Gives test date matching the requested test set ratio of the range given (to the nearest year).
@@ -109,25 +107,71 @@ def remove_percent(x):
     '''
     return float(x[:-1])
 
-#gets the number of decimal places in each column in the dataframe (assuming there are no null-columns)
 def getColsDecimalPlaces(df : pd.DataFrame) -> dict:
+    '''
+    Gets the number of decimal places in each column in the dataframe (assuming there are no null-columns)
+
+    Parameters:
+    -----------
+    df: Pandas DataFrame from which decimal place values are calculated.
+
+    Returns:
+    --------
+    Dictionary containing column names and their decimal place values
+    '''
     return {col : getColDecimalPlaces(df, col) for col in df.columns}
 
-#gets the number of decimal places used in the first element of a column in the data frame provided
 def getColDecimalPlaces(df : pd.DataFrame, colName : str) -> int:
+    '''
+    Gets the number of decimal places used in the first element of a column in the data frame provided
+
+    Parameters:
+    -----------
+    df: Pandas DataFrame from which decimal place value is calculated.
+    colName: String identifying which column in the DataFrame should be targeted.
+
+    Returns:
+    --------
+    Integer number of decimal places of the first element of the column
+    '''
     numString = str(df[colName][df[colName].isna() == False].iloc[0])
     splitNum = numString.split('.')
     if len(splitNum) != 2: raise ValueError(f'First extant element of column {colName} contains too many/ few decimal-point-separated sections.')
     return len(splitNum[1])
 
-#interpolates the specified column and rounds to its original no. of decimal places
 def interpolateAndRoundColumn(df : pd.DataFrame, colName : str, method='linear') -> pd.DataFrame:
+    '''
+    Interpolates the specified column and rounds to its original no. of decimal places
+
+    Parameters:
+    -----------
+    df: Pandas DataFrame which will have a column interpolated and rounded.
+    colName: String identifying which column in the DataFrame should be targeted.
+    method: Optional string that describes the interpolation method (see Pandas DataFrame.interpolate documentation)
+
+    Returns:
+    --------
+    DataFrame after interpolation and rounding of the specified column
+
+    '''
     df[colName] = df[colName].interpolate(method=method)
     numDps = getColDecimalPlaces(df, colName)
     df[colName] = df[colName].round(decimals=numDps)
     return df
 
 def getMissingCols(df, prin=False):
+    '''
+    Gets a map of the columns of the input DataFrame that contain missing values and the number of missing values
+
+    Parameters:
+    -----------
+    df: Pandas DataFrame from which decimal place value is calculated.
+    prin: Optional parameter that dictates whether the missing columns and their number of missing values is printed.
+
+    Returns:
+    --------
+    Dictionary mapping the name of each column containing missing values to its number of missing values
+    '''
     missingCols = {}
     for i, value in enumerate(df.isna().sum()):
         if value != 0:
@@ -135,13 +179,24 @@ def getMissingCols(df, prin=False):
             if prin: print(df.columns[i], value)
     return missingCols
 
-def printMissingCols(df):
+def printMissingCols(df : pd.DataFrame):
+    '''
+    Prints the number of columns containing missing values in the DataFrame provided, or informs the user that none exist.
+
+    Parameters:
+    -----------
+    df: Pandas DataFrame whose missing columns are to be identified.
+
+    Returns:
+    --------
+    
+    '''
     if not getMissingCols(df, prin=True): print('There are no columns with missing values in the dataframe provided.')
 
 def is_granger_caused(feature, y_trainDf, X_trainDf):
 
     '''
-    This function returns True if feature granger causes target.
+    This function returns True if feature Granger-causes target.
 
     Parameters:
     -----------
