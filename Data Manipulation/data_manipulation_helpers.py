@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
+from statsmodels.tsa.stattools import grangercausalitytests, adfuller
+import pandas as pd
 
-#
 def round_to_year(dt : datetime) -> datetime:
     '''
     Rounds datetime up or down to the nearest year.
@@ -20,7 +21,6 @@ def round_to_year(dt : datetime) -> datetime:
         leap = False
     return dt.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0) + timedelta(days=365+leap if dt.month >= 7 else 0)
 
-#
 def getTestDate(testRatio : float, startYear : int, endYear : int, verbose=False) -> str:
     '''
     Gives test date matching the requested test set ratio of the range given (to the nearest year).
@@ -48,9 +48,11 @@ def getTestDate(testRatio : float, startYear : int, endYear : int, verbose=False
     if actualRatio != testRatio and verbose: print(f'Rounding to years changed ratios. New ratios are:\nTest ratio: {actualRatio}, Train ratio: {1-actualRatio}')
     return rNTDDT.strftime('%m/%Y')
 
-def str_to_float(x):
+def str_to_float(x : str) -> float:
     '''
-    This function converts a string into a float, where the original data has K,M,B as shorthand instead of writing the zeros (investing.com often has data of this form).
+    This function converts a string into a float, where the original data has either
+    K,M,B as shorthand instead of writing the zeros (investing.com often has data of this form), or
+    contains commas, which are removed.
     
     Parameters:
     -----------
@@ -61,19 +63,16 @@ def str_to_float(x):
     float
 
     '''
-    #If input is already a float then return the input:
-    if type(x)== float:
-        return x
-    # convert K to 1000's
-    if x[-1]=='K':
-        return float(x[:-1])*1e3
-    # convert M to millions's
-    elif x[-1]=='M':
-        return float(x[:-1])*1e6
-    #Convert B to billions
-    elif x[-1]=='B':
-        return float(x[:-1])*1e9
-    #Return converted number
+
+    shorthandMap = {'K' : 1e3, 'M' : 1e6, 'B' : 1e9}
+    #Don't need to do anything if already a float
+    if type(x) == float: return x
+    #Remove the commas if they exist
+    if ',' in str(x):
+        x = x.replace(',', '')
+    #Multiply by respective order of magnitude if needed
+    if str(x)[-1] in list(shorthandMap.keys()):
+        x = float(x[:-1])*shorthandMap[x[-1]]
     return float(x)
 
 def rename_cols(df, name):
@@ -107,3 +106,132 @@ def remove_percent(x):
 
     '''
     return float(x[:-1])
+
+def getColsDecimalPlaces(df : pd.DataFrame) -> dict:
+    '''
+    Gets the number of decimal places in each column in the dataframe (assuming there are no null-columns)
+
+    Parameters:
+    -----------
+    df: Pandas DataFrame from which decimal place values are calculated.
+
+    Returns:
+    --------
+    Dictionary containing column names and their decimal place values
+    '''
+    return {col : getColDecimalPlaces(df, col) for col in df.columns}
+
+def getColDecimalPlaces(df : pd.DataFrame, colName : str) -> int:
+    '''
+    Gets the number of decimal places used in the first element of a column in the data frame provided
+
+    Parameters:
+    -----------
+    df: Pandas DataFrame from which decimal place value is calculated.
+    colName: String identifying which column in the DataFrame should be targeted.
+
+    Returns:
+    --------
+    Integer number of decimal places of the first element of the column
+    '''
+    numString = str(df[colName][df[colName].isna() == False].iloc[0])
+    splitNum = numString.split('.')
+    if len(splitNum) != 2: raise ValueError(f'First extant element of column {colName} contains too many/ few decimal-point-separated sections.')
+    return len(splitNum[1])
+
+def interpolateAndRoundColumn(df : pd.DataFrame, colName : str, method='linear') -> pd.DataFrame:
+    '''
+    Interpolates the specified column and rounds to its original no. of decimal places
+
+    Parameters:
+    -----------
+    df: Pandas DataFrame which will have a column interpolated and rounded.
+    colName: String identifying which column in the DataFrame should be targeted.
+    method: Optional string that describes the interpolation method (see Pandas DataFrame.interpolate documentation)
+
+    Returns:
+    --------
+    DataFrame after interpolation and rounding of the specified column
+
+    '''
+    df[colName] = df[colName].interpolate(method=method)
+    numDps = getColDecimalPlaces(df, colName)
+    df[colName] = df[colName].round(decimals=numDps)
+    return df
+
+def getMissingCols(df, prin=False):
+    '''
+    Gets a map of the columns of the input DataFrame that contain missing values and the number of missing values
+
+    Parameters:
+    -----------
+    df: Pandas DataFrame from which decimal place value is calculated.
+    prin: Optional parameter that dictates whether the missing columns and their number of missing values is printed.
+
+    Returns:
+    --------
+    Dictionary mapping the name of each column containing missing values to its number of missing values
+    '''
+    missingCols = {}
+    for i, value in enumerate(df.isna().sum()):
+        if value != 0:
+            missingCols[df.columns[i]] = value
+            if prin: print(df.columns[i], value)
+    return missingCols
+
+def printMissingCols(df : pd.DataFrame):
+    '''
+    Prints the number of columns containing missing values in the DataFrame provided, or informs the user that none exist.
+
+    Parameters:
+    -----------
+    df: Pandas DataFrame whose missing columns are to be identified.
+
+    Returns:
+    --------
+    
+    '''
+    if not getMissingCols(df, prin=True): print('There are no columns with missing values in the dataframe provided.')
+
+def is_granger_caused(feature, y_trainDf, X_trainDf):
+
+    '''
+    This function returns True if feature Granger-causes target.
+
+    Parameters:
+    -----------
+    feature: the name of the column within X_trainDf to test if it causes y_trainDf.
+
+    Returns:
+    --------
+
+    True: if feature granger causes target
+    False: if feature does NOT granger cause target.
+    '''
+
+    df_cpy= pd.concat((y_trainDf,X_trainDf[feature]),axis=1)# creates a deepcopy
+
+
+    i=1 # initialized to 1 as PCEPI is not sationary with no preprocessing
+
+    # peform adfuller test of xth differences untill both time series are stationary
+    while adfuller(df_cpy.diff(i).dropna().iloc[:,0])[1]>0.05 or adfuller(df_cpy.diff(i).dropna().iloc[:,1])[1]>0.05:
+        
+        i+=1
+
+        # Fail safe by keeping exogenous variable incase it by cause target, but may have a complex relationship
+        if i>4:
+            return True
+        
+    #Perform granger test:
+    test=grangercausalitytests(df_cpy.diff(i).dropna(),maxlag=6,verbose=False)
+
+    # see if there is  a time-lag which is granger caused:
+    for key in test:
+        
+        #Return true if granger caused
+        if test[key][0]['ssr_chi2test'][1]<0.05:
+            return True
+    
+    # Else return false NOT granger caused)
+    return False
