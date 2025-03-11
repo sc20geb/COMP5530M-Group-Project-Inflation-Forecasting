@@ -1,0 +1,5 @@
+hidden_size: 50
+input_size: 12
+learning_rate: 0.001
+num_layers: 1
+output_size: 1
