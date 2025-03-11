@@ -20,25 +20,33 @@ def minMaxScale(vals : np.array) -> np.array:
     return (vals - np.min(vals)) / (np.max(vals) - np.min(vals))
 
 #TODO: Should full Fourier transformed features (including before and after the sequence) be included for each sequence?
-def createSequences(data : np.array, sequence_length : int, other_features=[]) -> tuple[np.array, np.array]:
+def createSequences(data: np.array, sequence_length: int, use_fft=False):
     '''
-    Creates sequences (past sequence_length months → next month)
+    Creates sequences (past sequence_length months → next month), with optional Fourier Transform features.
 
     Parameters:
     -----------
     data: numpy array used to create the sequence
     sequence_length: length of the sequences requested
-    other_features (optional): additional features to include with each X sequence
+    use_fft: Boolean, whether to compute Fourier Transform features.
 
     Returns:
     --------
     numpy arrays containing the X and y values of each sequence at their corresponding indices
     '''
     X, y = [], []
+
     for i in range(len(data) - sequence_length):
-        if len(other_features) > 0: X.append(np.hstack([data[i : i + sequence_length].flatten(), other_features]))
-        else: X.append(data[i : i + sequence_length].flatten())
+        seq_data = data[i : i + sequence_length].flatten()
+        
+        if use_fft:
+            fft_features = np.abs(fft(seq_data))[:sequence_length]  # Compute FFT per sequence
+            fft_features = minMaxScale(fft_features)  # Normalize
+            seq_data = np.hstack([seq_data, fft_features])  # Append Fourier features
+
+        X.append(seq_data)
         y.append(data[i + sequence_length])
+
     return np.array(X), np.array(y)
 
 def trainValTestSplit(X : np.array, y : np.array, trainSize : float, valSize: float, testSize=None) -> tuple[np.array, np.array, np.array, np.array, np.array, np.array]:
@@ -77,16 +85,13 @@ def load_data(train_file, sequence_length=48):
     target_col = "fred_PCEPI"
     data = df[[target_col]].values.astype(np.float32)
 
-    # Compute Fourier Transform Features for Seasonality
-    fft_features = minMaxScale(np.abs(fft(data.flatten()))[:sequence_length])
+    # Compute Sequences with Fourier Features BEFORE Splitting
+    X, y = createSequences(data, sequence_length, use_fft=True)  # Apply Fourier before split
 
-    X, y = createSequences(data, sequence_length, fft_features)
-
-    # Train-Validation-Test Split (70%-15%-15%)
+    # Train-Validation-Test Split
     X_train, y_train, X_valid, y_valid, X_test, y_test = trainValTestSplit(X, y, 0.7, 0.15, 0.15)
 
-    # Fix Data Leakage: Scale After Splitting
-    #TODO: Why does this fix data leakage? Is the leakage from the Fourier transformed features?
+    # Fix Data Leakage: Scale AFTER Splitting
     scaler = MinMaxScaler()
     X_train = scaler.fit_transform(X_train)
     X_valid = scaler.transform(X_valid)
@@ -103,5 +108,6 @@ def load_data(train_file, sequence_length=48):
 def prepare_dataloader(X, y, batch_size=32):
     X_tensor = torch.tensor(X, dtype=torch.float32)
     y_tensor = torch.tensor(y, dtype=torch.float32)
+    assert X_tensor.shape[0] == y_tensor.shape[0], f"Size mismatch! X: {X_tensor.shape[0]}, y: {y_tensor.shape[0]}"
     dataset = TensorDataset(X_tensor, y_tensor)
     return DataLoader(dataset, batch_size=batch_size, shuffle=True)
