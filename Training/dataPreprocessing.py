@@ -19,7 +19,6 @@ def minMaxScale(vals : np.array) -> np.array:
     '''
     return (vals - np.min(vals)) / (np.max(vals) - np.min(vals))
 
-# Apply Fourier Transform Features
 def apply_fft_per_sequence(data, seq_len, num_components=10):
     '''
     Applies Fast Fourier Transform (FFT) to each sequence in the input time-series data 
@@ -47,8 +46,7 @@ def apply_fft_per_sequence(data, seq_len, num_components=10):
         fft_imag.append(np.log1p(np.abs(np.imag(fft_transformed[:num_components]))))
     return np.array(fft_real), np.array(fft_imag)
 
-# Create Lag Features
-def create_lagged_features(df, target_col, lags=[1, 3, 6]):
+def add_lagged_features(df, target_col, lags=[1, 3, 6]):
     '''
     Generates lagged features for the given target column.
     
@@ -73,8 +71,7 @@ def create_lagged_features(df, target_col, lags=[1, 3, 6]):
         df[f"{target_col}_lag{lag}"] = df[target_col].shift(lag)
     return df
 
-# Rolling Statistics
-def create_rolling_features(df, target_col, windows=[3, 6, 12]):
+def add_rolling_features(df, target_col, windows=[3, 6, 12]):
     '''
     Generates rolling window statistical features (mean & standard deviation) for the target column.
     
@@ -100,7 +97,6 @@ def create_rolling_features(df, target_col, windows=[3, 6, 12]):
         df[f"{target_col}_rolling_std{window}"] = df[target_col].rolling(window=window).std()
     return df
 
-# Convert Dates to Features
 def add_time_features(df):
     '''
     Extracts and adds time-based features from the 'observation_date' column.
@@ -126,7 +122,6 @@ def add_time_features(df):
     df["quarter"] = df["observation_date"].dt.quarter
     return df
 
-# Create Sequences for any model with flexible options
 def create_sequences(data, exog, fft_real, fft_imag, target, seq_len, config):
     """
     Creates sequences dynamically based on the provided configuration.
@@ -166,9 +161,22 @@ def create_sequences(data, exog, fft_real, fft_imag, target, seq_len, config):
         return np.array(X), np.array(y)
         
 
-# Train-Validation-Test Split
-def train_val_test_split(X, y, train_size, val_size, test_size=None):
-    """Splits dataset into training, validation, and test sets."""
+def train_val_test_split(X : np.array, y : np.array, train_size : float, val_size : float, test_size=None):
+    """
+    Splits dataset into training, validation, and test sets.
+
+    Parameters:
+    -----------
+    X: numpy array, time-series input data.
+    y: numpy array, time-series target data.
+    train_size: float giving the proportion of data represented by the training set.
+    val_size: float giving the proportion of data represented by the validation set.
+    train_size (optional): float giving the proportion of data represented by the test set. (inferred if not included)
+
+    Returns:
+    --------
+    Training, validation, and test input and target datasets.
+    """
     if not test_size:
         test_size = 1 - (train_size + val_size)
     if train_size + val_size + test_size != 1:
@@ -183,8 +191,7 @@ def train_val_test_split(X, y, train_size, val_size, test_size=None):
 
     return X_train, y_train, X_valid, y_valid, X_test, y_test
 
-# Load and Format Data for Any Model
-def load_data(train_file, sequence_length=48, config=None):
+def load_data(train_file : str, sequence_length=48, config={}):
     '''
     Loads and preprocesses time-series data for training a machine learning model.
 
@@ -206,7 +213,8 @@ def load_data(train_file, sequence_length=48, config=None):
         The number of past time steps to use for each sequence in the model.
     config: dict, optional
         A configuration dictionary that specifies whether to include FFT features 
-        and exogenous variables.
+        and exogenous variables. Of the form:
+        {"use_fft": bool, "use_exog": bool}
 
     Returns:
     --------
@@ -225,16 +233,14 @@ def load_data(train_file, sequence_length=48, config=None):
     exog_scaler: StandardScaler (if applicable)
         The scaler for exogenous features, if they are included.
     '''
-    if config is None:
-        config = {}
-    
+
     df = pd.read_csv(train_file)
     df["observation_date"] = pd.to_datetime(df["observation_date"], format="%m/%Y")
     df = df.sort_values(by="observation_date").reset_index(drop=True)
 
     target_col = "fred_PCEPI"
-    df = create_lagged_features(df, target_col)
-    df = create_rolling_features(df, target_col)
+    df = add_lagged_features(df, target_col)
+    df = add_rolling_features(df, target_col)
     df = add_time_features(df)
 
     df.dropna(inplace=True)
@@ -245,10 +251,10 @@ def load_data(train_file, sequence_length=48, config=None):
     
     X_train, y_train, X_valid, y_valid, X_test, y_test = train_val_test_split(data, data, 0.7, 0.15, 0.15)
     
-    scaler = MinMaxScaler()
-    X_train = scaler.fit_transform(X_train)
-    X_valid = scaler.transform(X_valid)
-    X_test = scaler.transform(X_test)
+    X_scaler = MinMaxScaler()
+    X_train = X_scaler.fit_transform(X_train)
+    X_valid = X_scaler.transform(X_valid)
+    X_test = X_scaler.transform(X_test)
 
     y_scaler = MinMaxScaler()
     y_train = y_scaler.fit_transform(y_train.reshape(-1, 1))
@@ -260,7 +266,7 @@ def load_data(train_file, sequence_length=48, config=None):
         valid_fft_real, valid_fft_imag = apply_fft_per_sequence(X_valid, sequence_length)
         test_fft_real, test_fft_imag = apply_fft_per_sequence(X_test, sequence_length)
     else:
-        train_fft_real, train_fft_imag, valid_fft_real, valid_fft_imag, test_fft_real, test_fft_imag = None, None, None, None, None, None
+        train_fft_real, train_fft_imag, valid_fft_real, valid_fft_imag, test_fft_real, test_fft_imag = [None for _ in range(6)]
     
     if config.get("use_exog", False):
         exog_scaler = StandardScaler()
@@ -272,18 +278,28 @@ def load_data(train_file, sequence_length=48, config=None):
         X_valid_seq, X_exog_valid_seq, y_valid_seq = create_sequences(X_valid, X_exog_valid, valid_fft_real, valid_fft_imag, y_valid, sequence_length, config)
         X_test_seq, X_exog_test_seq, y_test_seq = create_sequences(X_test, X_exog_test, test_fft_real, test_fft_imag, y_test, sequence_length, config)
     
-        return X_train_seq, X_exog_train_seq, y_train_seq, X_valid_seq, X_exog_valid_seq, y_valid_seq, X_test_seq, X_exog_test_seq, y_test_seq, df["observation_date"].iloc[sequence_length:], scaler, exog_scaler, y_scaler
+        return X_train_seq, X_exog_train_seq, y_train_seq, X_valid_seq, X_exog_valid_seq, y_valid_seq, X_test_seq, X_exog_test_seq, y_test_seq, df["observation_date"].iloc[sequence_length:], exog_scaler, y_scaler
     
     X_train_seq, y_train_seq = create_sequences(X_train, None, train_fft_real, train_fft_imag, y_train, sequence_length, config)
     X_valid_seq, y_valid_seq = create_sequences(X_valid, None, valid_fft_real, valid_fft_imag, y_valid, sequence_length, config)
     X_test_seq, y_test_seq = create_sequences(X_test, None, test_fft_real, test_fft_imag, y_test, sequence_length, config)
     
-    return X_train_seq, y_train_seq, X_valid_seq, y_valid_seq, X_test_seq, y_test_seq, df["observation_date"].iloc[sequence_length:], scaler, y_scaler
+    return X_train_seq, y_train_seq, X_valid_seq, y_valid_seq, X_test_seq, y_test_seq, df["observation_date"].iloc[sequence_length:], y_scaler
 
+def prepare_dataloader(X : np.array, y : np.array, batch_size=32) -> DataLoader:
+    '''
+    Converts dataset into PyTorch DataLoader.
 
-# Convert Data to PyTorch Tensors
-def prepare_dataloader(X, y, batch_size=32):
-    """Converts dataset into PyTorch DataLoader."""
+    Parameters:
+    -----------
+    X: numpy array, time-series input data.
+    y: numpy array, time-series target data.
+    batch_size: integer, size of the batches returned by the DataLoader.
+
+    Returns:
+    --------
+    The DataLoader as requested
+    '''
     X_tensor = torch.tensor(X, dtype=torch.float32)
     y_tensor = torch.tensor(y, dtype=torch.float32)
     dataset = TensorDataset(X_tensor, y_tensor)
