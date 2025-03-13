@@ -26,7 +26,7 @@ def evaluate_model(model : torch.nn.Module, savepath : str, X_test : np.array, d
     if y_scaler: return y_scaler.inverse_transform(predictions)
     return predictions
 
-def get_best_path(savepath : str, model_name : str) -> str:
+def get_best_path(savepath : str, model_name : str, stopped_at=-1) -> str:
     """
     Gets the filepath of the first best model with a given name
 
@@ -34,11 +34,13 @@ def get_best_path(savepath : str, model_name : str) -> str:
     -----------
     savepath: String defining the directory in which model weights are stored
     model_name: String defining the model's name (used to name its weight file)
+    stopped_at (optional): Integer defining the epoch at which the model was stopped for fetching specific early-stopped models
 
     Returns:
     --------
     String defining the file path to the first best model
     """
-    #Could select any of these; they each represent a single training run
-    bestFile = [path for path in os.listdir(savepath) if 'BEST' in path and model_name in path][0]
+    if stopped_at != -1: bestFile = f'{model_name}_BEST_STOPPED_AT_{stopped_at}.pth'
+    #Could select any of the items in this list; they each represent a single training run
+    else: bestFile = [path for path in os.listdir(savepath) if 'BEST' in path and model_name in path][0]
     return os.path.join(savepath, bestFile)

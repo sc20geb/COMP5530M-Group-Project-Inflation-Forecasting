@@ -140,6 +140,7 @@ def train_model(
     lossFn: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
     device: torch.device,
+    scheduler=None,
     batchStatusUpdate=None,
     verbose=None,
     seed=42,
@@ -167,7 +168,9 @@ def train_model(
 
     device: The device to run the model on
 
-    seed: Sets the random state of the model for reproducibility. Defaults to 42.
+    scheduler (optional): The learning rate scheduler to be used, if any
+
+    seed (optional): Sets the random state of the model for reproducibility. Defaults to 42.
     NOTE: random state may not be excactly the same as CUDA has its own randomness on the graphics card.
 
     Returns:
@@ -208,6 +211,9 @@ def train_model(
         if verbose is not None:
             print(f"Train Loss epoch {epoch}: {trainLoss}")
             print(f"Valid Loss epoch {epoch}: {validLoss}")
+
+        # Pass validation loss to scheduler, if provided
+        if scheduler: scheduler.step(validLoss)
 
         # Check if model needs to stop early:
         if stopper(model, validLoss):
