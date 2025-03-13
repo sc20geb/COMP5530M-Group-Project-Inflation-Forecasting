@@ -192,35 +192,47 @@ def train_model(
         model.train()
         train_loss = 0
 
-        for batch, (X, Y) in enumerate(dataLoaderTrain):
-            X, Y = X.to(device), Y.to(device)
+        for batch, batch_data in enumerate(dataLoaderTrain):  # Rename 'data' to 'batch_data'
+            if len(batch_data) == 3:  # Case where exogenous variables exist
+                X, X_exog, Y = batch_data
+                X, X_exog, Y = X.to(device), X_exog.to(device), Y.to(device)
+            else:  # Case where only X, Y exist (no exogenous variables)
+                X, Y = batch_data
+                X, Y = X.to(device), Y.to(device)
 
             optimizer.zero_grad()
-            y_pred = model(X)
+            y_pred = model(X, X_exog) if "X_exog" in locals() else model(X)  # Model supports exogenous variables
             loss = lossFn(y_pred, Y)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
+            train_loss += loss.item()
 
-            train_loss += loss.item() * Y.shape[0]
-
-            if batchStatusUpdate and batch % batchStatusUpdate == 0:
-                print(f"\tBatch {batch}/{len(dataLoaderTrain)} processed.")
-
-        train_loss /= len(dataLoaderTrain.dataset)
-        data["trainLoss"].append(train_loss)
+        train_loss /= len(dataLoaderTrain)
+        data["trainLoss"].append(train_loss)  # Ensure 'data' remains a dictionary
 
         model.eval()
         valid_loss = 0
         with torch.inference_mode():
-            for X, Y in dataLoaderValid:
-                X, Y = X.to(device), Y.to(device)
-                y_pred = model(X)
+            for batch in dataLoaderValid:
+                if len(batch) == 3:  # Exogenous variables present
+                    X, X_exog, Y = batch
+                    X, X_exog, Y = X.to(device), X_exog.to(device), Y.to(device)
+                    y_pred = model(X, X_exog)
+                else:  # No exogenous variables
+                    X, Y = batch
+                    X, Y = X.to(device), Y.to(device)
+                    y_pred = model(X)
+
                 loss = lossFn(y_pred, Y)
                 valid_loss += loss.item() * Y.shape[0]
 
-        valid_loss /= len(dataLoaderValid.dataset)
-        data["validLoss"].append(valid_loss)
+        valid_loss /= len(dataLoaderValid)
+        if isinstance(data, dict):  # Ensure 'data' is a dictionary
+            data["validLoss"].append(valid_loss)
+        else:
+            raise TypeError("Expected 'data' to be a dictionary, but got: ", type(data))
+
         data["times"].append(time.time() - t0)
 
         if verbose:
