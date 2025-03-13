@@ -278,48 +278,29 @@ def load_data(train_file : str, sequence_length=48, config={}):
         X_valid_seq, X_exog_valid_seq, y_valid_seq = create_sequences(X_valid, X_exog_valid, valid_fft_real, valid_fft_imag, y_valid, sequence_length, config)
         X_test_seq, X_exog_test_seq, y_test_seq = create_sequences(X_test, X_exog_test, test_fft_real, test_fft_imag, y_test, sequence_length, config)
     
-        return X_train_seq, X_exog_train_seq, y_train_seq, \
-               X_valid_seq, X_exog_valid_seq, y_valid_seq, \
-               X_test_seq, X_exog_test_seq, y_test_seq, \
-               df["observation_date"].iloc[sequence_length:], X_scaler, exog_scaler, y_scaler
-
-    # If no exogenous variables exist, return only X and y
+        return X_train_seq, X_exog_train_seq, y_train_seq, X_valid_seq, X_exog_valid_seq, y_valid_seq, X_test_seq, X_exog_test_seq, y_test_seq, df["observation_date"].iloc[sequence_length:], exog_scaler, y_scaler
+    
     X_train_seq, y_train_seq = create_sequences(X_train, None, train_fft_real, train_fft_imag, y_train, sequence_length, config)
     X_valid_seq, y_valid_seq = create_sequences(X_valid, None, valid_fft_real, valid_fft_imag, y_valid, sequence_length, config)
     X_test_seq, y_test_seq = create_sequences(X_test, None, test_fft_real, test_fft_imag, y_test, sequence_length, config)
-        
-    return X_train_seq, y_train_seq, \
-        X_valid_seq, y_valid_seq, \
-        X_test_seq, y_test_seq, \
-        df["observation_date"].iloc[sequence_length:], y_scaler
+    
+    return X_train_seq, y_train_seq, X_valid_seq, y_valid_seq, X_test_seq, y_test_seq, df["observation_date"].iloc[sequence_length:], y_scaler
 
-
-def prepare_dataloader(X, y, X_exog=None, batch_size=32):
-    """
+def prepare_dataloader(X : np.array, y : np.array, batch_size=32) -> DataLoader:
+    '''
     Converts dataset into PyTorch DataLoader.
-
-    Modifications:
-    - Supports exogenous variables.
-    - Ensures `(X, X_exog, y)` format when exog data is present.
 
     Parameters:
     -----------
     X: numpy array, time-series input data.
     y: numpy array, time-series target data.
-    X_exog: numpy array, optional exogenous variable input.
-    batch_size: int, size of batches.
+    batch_size: integer, size of the batches returned by the DataLoader.
 
     Returns:
     --------
-    PyTorch DataLoader.
-    """
+    The DataLoader as requested
+    '''
     X_tensor = torch.tensor(X, dtype=torch.float32)
     y_tensor = torch.tensor(y, dtype=torch.float32)
-
-    if X_exog is not None:
-        X_exog_tensor = torch.tensor(X_exog, dtype=torch.float32)
-        dataset = TensorDataset(X_tensor, X_exog_tensor, y_tensor)
-    else:
-        dataset = TensorDataset(X_tensor, y_tensor)
-
+    dataset = TensorDataset(X_tensor, y_tensor)
     return DataLoader(dataset, batch_size=batch_size, shuffle=True)
