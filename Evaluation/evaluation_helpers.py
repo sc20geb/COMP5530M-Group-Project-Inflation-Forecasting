@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import os
 
-def evaluate_model(model : torch.nn.Module, savepath : str, X_test : np.array, device=None, y_scaler = None):
+def evaluate_model(model: torch.nn.Module, savepath: str, X_test: np.array, exog_test=None, device=None, y_scaler=None):
     """
     Loads given saved model and evaluates on test set
 
@@ -11,6 +11,7 @@ def evaluate_model(model : torch.nn.Module, savepath : str, X_test : np.array, d
     model: Instance of model architecture to load weights into and evaluate
     savepath: String defining where the saved model is
     X_test: Test data on which to evaluate the model
+    exog_test: Optional exogenous variables for the test set
     device (optional): Torch device to transfer the test data to before running through the model
     y_scaler (optional): Scaler for prediction values
 
@@ -18,12 +19,23 @@ def evaluate_model(model : torch.nn.Module, savepath : str, X_test : np.array, d
     --------
     Predictions of the loaded model on the test set provided
     """
-    if not device: device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if not device:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.load_state_dict(torch.load(savepath))
     model.eval()
+
     X_test_tensor = torch.tensor(X_test, dtype=torch.float32).to(device)
-    predictions = model(X_test_tensor).detach().cpu().numpy()
-    if y_scaler: return y_scaler.inverse_transform(predictions)
+
+    # Convert exog_test to tensor if needed
+    if exog_test is not None:
+        exog_test_tensor = torch.tensor(exog_test, dtype=torch.float32).to(device)
+        predictions = model(X_test_tensor, exog_test_tensor).detach().cpu().numpy()
+    else:
+        predictions = model(X_test_tensor).detach().cpu().numpy()
+
+
+    if y_scaler:
+        return y_scaler.inverse_transform(predictions)
     return predictions
 
 def get_best_path(savepath : str, model_name : str, stopped_at=-1) -> str:

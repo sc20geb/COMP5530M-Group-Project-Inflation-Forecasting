@@ -4,10 +4,10 @@ import torch
 
 class EarlyStopping:
 
-    def __init__(self, tol=1e-3, patientce=15):
+    def __init__(self, tol=1e-3, patience=15):
 
         self.tol = tol
-        self.patientce = patientce
+        self.patience = patience
         self.counter = 0
         self.bestModel = None
         self.bestLoss = None
@@ -26,7 +26,7 @@ class EarlyStopping:
         else:
             self.counter += 1
 
-            if self.counter == self.patientce:
+            if self.counter == self.patience:
                 print(f"Early stopping. counter: {self.counter}")
 
                 return True
