@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from EarlyStopping import EarlyStopping
 import time
 import pickle
+import os
 
 
 def train_epoch(
@@ -142,140 +143,135 @@ def train_model(
     device: torch.device,
     scheduler=None,
     batchStatusUpdate=None,
-    verbose=None,
+    verbose=True,
     seed=42,
 ):
     """
-    This function trains a model for given number of epochs.
+    This function trains a model for given number of epochs and saves the best performing model.
 
-    Parameters
+    Parameters:
     ----------
-    model: The model that needs to be trained
-
-    maxEpochs: The maximum amount of epochs to train the model (assuming early stopping does not occur).
-
-    modelSavePath: The path to the directory where the model gets saved for each epoch
-
-    modelName: The name of the model (Used for saving the model).
-
-    dataLoaderTrain: The dataloader used to train the model
-
-    dataLoaderValid: The dataloader of the validation data to evaluate the model (NOT test data).
-
-    lossFn: Loss function to evalute the model
-
-    optimizer: The optimizer used to improve the model
-
-    device: The device to run the model on
-
-    scheduler (optional): The learning rate scheduler to be used, if any
-
-    seed (optional): Sets the random state of the model for reproducibility. Defaults to 42.
-    NOTE: random state may not be excactly the same as CUDA has its own randomness on the graphics card.
+    model: The model that needs to be trained.
+    maxEpochs: Maximum number of epochs to train the model.
+    modelSavePath: Directory where the best model will be saved.
+    modelName: Name of the model for saving.
+    dataLoaderTrain: DataLoader for training data.
+    dataLoaderValid: DataLoader for validation data.
+    lossFn: Loss function to evaluate the model.
+    optimizer: Optimizer to improve the model.
+    device: Device to run the model on ("cuda" or "cpu").
+    scheduler: (Optional) Learning rate scheduler.
+    batchStatusUpdate: (Optional) Prints batch status update frequency.
+    verbose: (Optional) Whether to print loss updates.
+    seed: (Optional) Random seed for reproducibility.
 
     Returns:
     --------
-    Returns dictionary of traing Data
+    Returns dictionary containing:
+    - 'trainLoss': List of training losses for each epoch.
+    - 'validLoss': List of validation losses for each epoch.
+    - 'best_model_path': Path to the saved best model.
     """
+    os.makedirs(modelSavePath, exist_ok=True)
+    best_model_path = None  # Initialize best model path
 
     data = {
         "trainLoss": [],
         "validLoss": [],
         "times": [],
-    }  # used to store data about training for all epochs
+    }
 
-    stopper = EarlyStopping()  # initializes early stopping
+    stopper = EarlyStopping()
+    best_val_loss = float("inf")
 
-    torch.manual_seed(seed)  # sets random state
+    torch.manual_seed(seed)
 
-    # loop over each epoch
-    for epoch in tqdm(range(0, maxEpochs)):
+    for epoch in tqdm(range(0, maxEpochs), desc="Training Progress"):
 
-        t0 = time.time()  # sets timer for epoch
+        t0 = time.time()
+        model.train()
+        train_loss = 0
 
-        # Train model for one epoch
-        trainLoss = train_epoch(
-            model, dataLoaderTrain, lossFn, optimizer, device, batchStatusUpdate
-        )
+        for batch, (X, Y) in enumerate(dataLoaderTrain):
+            X, Y = X.to(device), Y.to(device)
 
-        data["times"].append(time.time() - t0)  # add training time for epoch
+            optimizer.zero_grad()
+            y_pred = model(X)
+            loss = lossFn(y_pred, Y)
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            optimizer.step()
 
-        data["trainLoss"].append(trainLoss)  # add average trainloss for epoch
+            train_loss += loss.item() * Y.shape[0]
 
-        # validate model:
-        validLoss = validate_logits(model, dataLoaderValid, lossFn, device)
+            if batchStatusUpdate and batch % batchStatusUpdate == 0:
+                print(f"\tBatch {batch}/{len(dataLoaderTrain)} processed.")
 
-        data["validLoss"].append(validLoss)  # add validation Loss for epoch
+        train_loss /= len(dataLoaderTrain.dataset)
+        data["trainLoss"].append(train_loss)
 
-        # Inform user of training loss and validation loss:
-        if verbose is not None:
-            print(f"Train Loss epoch {epoch}: {trainLoss}")
-            print(f"Valid Loss epoch {epoch}: {validLoss}")
+        model.eval()
+        valid_loss = 0
+        with torch.inference_mode():
+            for X, Y in dataLoaderValid:
+                X, Y = X.to(device), Y.to(device)
+                y_pred = model(X)
+                loss = lossFn(y_pred, Y)
+                valid_loss += loss.item() * Y.shape[0]
 
-        # Pass validation loss to scheduler, if provided
-        if scheduler: scheduler.step(validLoss)
+        valid_loss /= len(dataLoaderValid.dataset)
+        data["validLoss"].append(valid_loss)
+        data["times"].append(time.time() - t0)
 
-        # Check if model needs to stop early:
-        if stopper(model, validLoss):
-            # resore the weights with the best validation loss:
+        if verbose:
+            print(f"Epoch {epoch+1}/{maxEpochs} - Train Loss: {train_loss:.6f}, Val Loss: {valid_loss:.6f}")
+
+        if scheduler:
+            scheduler.step(valid_loss)
+
+        # Save best model dynamically
+        if valid_loss < best_val_loss:
+            best_val_loss = valid_loss
+            best_model_path = os.path.join(modelSavePath, f"{modelName}_BEST_STOPPED_AT_{epoch+1}.pth")
+            torch.save(model.state_dict(), best_model_path)
+            print(f"Best model saved at {best_model_path} (Epoch {epoch+1})")
+
+        if stopper(model, valid_loss):
             stopper.restoreBestWeights(model)
+            print(f"Early stopping at epoch {epoch+1}. Best model restored.")
+            return {
+                "trainLoss": data["trainLoss"],
+                "validLoss": data["validLoss"],
+                "best_model_path": best_model_path,
+            }
 
-            # Save traing data:
-            with open(
-                f"{modelSavePath}/{modelName}_data_stopped.pickle", "wb"
-            ) as handle:
-                pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-            # Save model weights: NOTE: informs the user which epoch had the best validation loss by adding it to the name of the weights file
-            torch.save(
-                model.state_dict(),
-                f"{modelSavePath}/{modelName}_BEST_STOPPED_AT_{epoch-stopper.counter}.pth",
-            )
-            print(
-                f"Stopped at epoch: {epoch}\nBest weights at epoch: {epoch-stopper.counter}"
-            )
-            # return data for training
-            return data
-
-        # save model at each epoch (incase of failure):
-        torch.save(model.state_dict(), f"{modelSavePath}/{modelName}_latest.pth")
-
-    # If model has reached maxEpochs, return data and save model NOTE: model name will have "_UNSTOPPED" appended to inform model has not converged.
-    torch.save(model.state_dict(), f"{modelSavePath}/{modelName}_UNSTOPPED.pth")
-
-    # Save traing data:
-    with open(f"{modelSavePath}/{modelName}_data_unstopped.pickle", "wb") as handle:
-        pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-    # return data for training
-    return data
-
-
+    print(f"Training completed. Best model saved at {best_model_path}")
+    return {
+        "trainLoss": data["trainLoss"],
+        "validLoss": data["validLoss"],
+        "best_model_path": best_model_path,
+    }
+    
 def loss_curve(trainLoss: list, validLoss: list, title: str = None):
     """
-    This function graphs the training loss and validation loss over epochs
+    This function graphs the training loss and validation loss over epochs.
 
     Parameters:
     -----------
-    trainLoss: List of training loss's in ascending order of epochs
-
-    validLoss: List of validation loss's in ascending order of epochs
-
-    title: title of graph. If None, then no title is given
+    trainLoss: List of training losses in ascending order of epochs.
+    validLoss: List of validation losses in ascending order of epochs.
+    title: (Optional) Title of the graph.
 
     Returns:
     --------
-    Void
+    Void (Displays the graph).
     """
-    epochs = list(range(1, len(trainLoss) + 1))
-    plt.plot(epochs, trainLoss, label="train loss")
-    plt.plot(epochs, validLoss, label="valid loss")
-
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(1, len(trainLoss) + 1), trainLoss, label="Training Loss", color="blue")
+    plt.plot(range(1, len(validLoss) + 1), validLoss, label="Validation Loss", color="red")
     plt.xlabel("Epochs")
-    plt.ylabel("loss")
-
-    if title is not None:
-        plt.title(title)
-
+    plt.ylabel("Loss")
+    plt.title(title if title else "Training vs Validation Loss")
     plt.legend()
+    plt.grid(True)
     plt.show()
