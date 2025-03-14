@@ -175,7 +175,7 @@ def train_model(
     os.makedirs(modelSavePath, exist_ok=True)
     best_model_path = None  # Initialize best model path
 
-    data = {
+    metaData = {
         "trainLoss": [],
         "validLoss": [],
         "times": [],
@@ -192,24 +192,30 @@ def train_model(
         model.train()
         train_loss = 0
 
-        for batch, batch_data in enumerate(dataLoaderTrain):  # Rename 'data' to 'batch_data'
+        for batch, batch_data in enumerate(dataLoaderTrain):
             if len(batch_data) == 3:  # Case where exogenous variables exist
                 X, X_exog, Y = batch_data
                 X, X_exog, Y = X.to(device), X_exog.to(device), Y.to(device)
+                y_pred = model(X, X_exog)
             else:  # Case where only X, Y exist (no exogenous variables)
                 X, Y = batch_data
                 X, Y = X.to(device), Y.to(device)
+                y_pred = model(X)
 
             optimizer.zero_grad()
-            y_pred = model(X, X_exog) if "X_exog" in locals() else model(X)  # Model supports exogenous variables
             loss = lossFn(y_pred, Y)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             train_loss += loss.item()
 
+            #inform user of the current batch number when requested
+            if batchStatusUpdate:
+                if batch % batchStatusUpdate == 0:
+                    print(f"\tBatch: {batch}")
+
         train_loss /= len(dataLoaderTrain)
-        data["trainLoss"].append(train_loss)  # Ensure 'data' remains a dictionary
+        metaData["trainLoss"].append(train_loss)
 
         model.eval()
         valid_loss = 0
@@ -228,12 +234,12 @@ def train_model(
                 valid_loss += loss.item() * Y.shape[0]
 
         valid_loss /= len(dataLoaderValid)
-        if isinstance(data, dict):  # Ensure 'data' is a dictionary
-            data["validLoss"].append(valid_loss)
-        else:
-            raise TypeError("Expected 'data' to be a dictionary, but got: ", type(data))
-
-        data["times"].append(time.time() - t0)
+        # Ensure 'data' is a dictionary
+        if not isinstance(metaData, dict): 
+            raise TypeError("Expected 'metaData' to be a dictionary, but got: ", type(metaData)) 
+        
+        metaData["validLoss"].append(valid_loss)
+        metaData["times"].append(time.time() - t0)
 
         if verbose:
             print(f"Epoch {epoch+1}/{maxEpochs} - Train Loss: {train_loss:.6f}, Val Loss: {valid_loss:.6f}")
@@ -246,23 +252,16 @@ def train_model(
             best_val_loss = valid_loss
             best_model_path = os.path.join(modelSavePath, f"{modelName}_BEST_STOPPED_AT_{epoch+1}.pth")
             torch.save(model.state_dict(), best_model_path)
+            metaData["best_model_path"] = best_model_path
             print(f"Best model saved at {best_model_path} (Epoch {epoch+1})")
 
         if stopper(model, valid_loss):
             stopper.restoreBestWeights(model)
             print(f"Early stopping at epoch {epoch+1}. Best model restored.")
-            return {
-                "trainLoss": data["trainLoss"],
-                "validLoss": data["validLoss"],
-                "best_model_path": best_model_path,
-            }
+            return metaData
 
     print(f"Training completed. Best model saved at {best_model_path}")
-    return {
-        "trainLoss": data["trainLoss"],
-        "validLoss": data["validLoss"],
-        "best_model_path": best_model_path,
-    }
+    return metaData
     
 def loss_curve(trainLoss: list, validLoss: list, title: str = None):
     """

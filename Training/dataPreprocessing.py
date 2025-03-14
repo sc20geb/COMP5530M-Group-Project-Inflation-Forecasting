@@ -296,17 +296,13 @@ def load_data(train_file : str, sequence_length=48, config={}):
 
 def prepare_dataloader(X, y, X_exog=None, batch_size=32):
     """
-    Converts dataset into PyTorch DataLoader.
-
-    Modifications:
-    - Supports exogenous variables.
-    - Ensures `(X, X_exog, y)` format when exog data is present.
+    Converts dataset, optionally with exogenous variables, into PyTorch DataLoader.
 
     Parameters:
     -----------
     X: numpy array, time-series input data.
     y: numpy array, time-series target data.
-    X_exog: numpy array, optional exogenous variable input.
+    X_exog (optional): numpy array, exogenous variable input.
     batch_size: int, size of batches.
 
     Returns:
