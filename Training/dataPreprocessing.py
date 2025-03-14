@@ -4,6 +4,8 @@ import numpy as np
 from scipy.fftpack import fft
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from torch.utils.data import DataLoader, TensorDataset
+from statsmodels.tsa.stattools import pacf
+import statsmodels.api as sm
 
 def minMaxScale(vals : np.array) -> np.array:
     '''
@@ -319,3 +321,40 @@ def prepare_dataloader(X, y, X_exog=None, batch_size=32):
         dataset = TensorDataset(X_tensor, y_tensor)
 
     return DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+def best_lag_selection(train_series : sm.tools.typing.ArrayLike1D, max_lags : int = 12, verbose: bool = False) -> int:
+    """
+    Picks a 'best_lag' for ARDL in levels by:
+      1) Checking partial autocorrelation (PACF)
+      2) Checking a simple AR(lag) model's AIC
+
+    Parameters:
+    -----------
+    X: numpy array, time-series input data.
+    y: numpy array, time-series target data.
+    X_exog (optional): numpy array, exogenous variable input.
+    batch_size: int, size of batches.
+
+    Returns:
+    --------
+    Integer 'best_lag'.
+    """
+    pacf_vals = pacf(train_series, nlags=max_lags)
+    best_pacf_lag = np.argmax(np.abs(pacf_vals[1:])) + 1
+
+    best_aic_lag, best_aic = 1, float("inf")
+    for lag in range(1, max_lags + 1):
+        y = train_series[lag:]
+        X = train_series.shift(lag)[lag:]
+        X = sm.add_constant(X, prepend=True)
+        try:
+            model = sm.OLS(y, X).fit()
+            if model.aic < best_aic:
+                best_aic_lag = lag
+                best_aic = model.aic
+        except:
+            continue
+
+    selected_lag = min(best_pacf_lag, best_aic_lag)
+    if verbose: print(f" - best_lag by PACF: {best_pacf_lag}, best_lag by AIC: {best_aic_lag}")
+    return selected_lag
