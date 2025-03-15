@@ -18,9 +18,8 @@ def cleanWeightFiles(modelName : str, earlyStopped:bool = True, filePath: str = 
     void
     """
     for fileName in os.listdir(filePath):
-        if modelName in fileName:
-            if earlyStopped:
-                if 'BEST_STOPPED_AT' in fileName:
-                    os.remove(os.path.join(filePath, fileName))
-            else:
-                os.remove(os.path.join(filePath, fileName))
+        if modelName not in fileName: continue
+        if earlyStopped and 'BEST_STOPPED_AT' in fileName:
+            os.remove(os.path.join(filePath, fileName))
+        else:
+            os.remove(os.path.join(filePath, fileName))

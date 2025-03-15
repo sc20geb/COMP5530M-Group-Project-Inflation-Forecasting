@@ -193,7 +193,7 @@ def train_val_test_split(X : np.array, y : np.array, train_size : float, val_siz
 
     return X_train, y_train, X_valid, y_valid, X_test, y_test
 
-def load_data(train_file : str, sequence_length=48, config={}):
+def load_data(train_file : str, sequence_length=48, train_size : float = 0.7, val_size : float = 0.15, test_size : float = 0.15, config={}):
     '''
     Loads and preprocesses time-series data for training a machine learning model.
 
@@ -213,6 +213,12 @@ def load_data(train_file : str, sequence_length=48, config={}):
         The file path to the CSV containing time-series data.
     sequence_length: int, default=48
         The number of past time steps to use for each sequence in the model.
+    train_size: float,
+        The proportion of the dataset assigned to training.
+    val_size: float,
+        The proportion of the dataset assigned to validation.
+    test_size: float,
+        The proportion of the dataset assigned to testing.
     config: dict, optional
         A configuration dictionary that specifies whether to include FFT features 
         and exogenous variables. Of the form:
@@ -251,7 +257,7 @@ def load_data(train_file : str, sequence_length=48, config={}):
     data = df[[target_col]].values.astype(np.float32)
     exog_data = df[exog_cols].values.astype(np.float32) if config.get("use_exog", False) else None
     
-    X_train, y_train, X_valid, y_valid, X_test, y_test = train_val_test_split(data, data, 0.7, 0.15, 0.15)
+    X_train, y_train, X_valid, y_valid, X_test, y_test = train_val_test_split(data, data, train_size, val_size, test_size)
     
     X_scaler = MinMaxScaler()
     X_train = X_scaler.fit_transform(X_train)
