@@ -124,6 +124,28 @@ def add_time_features(df):
     df["quarter"] = df["observation_date"].dt.quarter
     return df
 
+def add_modified_feature(df, target_col, func):
+    '''
+    Adds a new column to the DataFrame provided representing the target column with some function applied.
+
+    Parameters:
+    -----------
+    df: pandas DataFrame
+        The input DataFrame containing the target column
+    target_col: str
+        The name of the target column used to create the new modified feature.
+    func: Callable[pd.Series]
+        Function taking a pandas series as input, which returns a modified version of that series.
+
+    Returns:
+    --------
+    df: pandas DataFrame
+        The DataFrame with the additional feature specified, named according to the __name__ attribute of the function provided and the name of the target column.
+    '''
+    if target_col not in df.columns: raise ValueError(f'{target_col} not a column in the input DataFrame.')
+    df[f"{func.__name__}_{target_col}"] = func(df[target_col])
+    return df
+
 def create_sequences(data, exog, fft_real, fft_imag, target, seq_len, config):
     """
     Creates sequences dynamically based on the provided configuration.
@@ -364,3 +386,52 @@ def best_lag_selection(train_series : sm.tools.typing.ArrayLike1D, max_lags : in
     selected_lag = min(best_pacf_lag, best_aic_lag)
     if verbose: print(f" - best_lag by PACF: {best_pacf_lag}, best_lag by AIC: {best_aic_lag}")
     return selected_lag
+
+def drop_near_constant_cols(df, threshold=1e-6):
+    """
+    Removes near-constant columns according to their standard deviation (for models that struggle with constant values).
+
+    Parameters:
+    -----------
+    df: DataFrame
+        DataFrame from which near-constant columns are removed
+    threshold: float
+        Minimum standard deviation for a column to be considered non-constant
+
+    Returns:
+    --------
+    Modified DataFrame, list of names of dropped columns
+    """
+    orig_cols = df.columns
+    newDf = df.loc[:, df.std() > threshold]
+    return newDf, list(set(orig_cols)-set(newDf.columns))
+
+
+def sklearn_fit_transform(train_df, test_df, sklearn_func, **func_kwargs):
+    """
+    Creates DataFrames containing sklearn-transformed train and test datasets.
+    Transform is fitted on the training set, and applied to both the training and testing sets.
+
+    Parameters:
+    -----------
+    train_df: DataFrame
+        DataFrame containing the training data
+    test_df: DataFrame
+        DataFrame containing the test data
+    sklearn_func: sklearn transform
+        The transform to be applied to the data. Must implement the fit-transform sklearn API
+    **func_kwargs: keyword arguments
+        Keyword arguments for the sklearn function
+
+    Returns:
+    --------
+    DataFrames containing the transformed training dataset and the transformed test dataset respectively.
+    """
+    obj = sklearn_func(**func_kwargs)
+    obj.fit(train_df)  # fit on train only
+
+    transformed_train = obj.transform(train_df)
+    transformed_test = obj.transform(test_df)
+
+    new_cols = [f"{sklearn_func.__name__}_{i+1}" for i in range(transformed_train.shape[1])]
+    return pd.DataFrame(transformed_train, index=train_df.index, columns=new_cols), pd.DataFrame(transformed_test,  index=test_df.index,  columns=new_cols)
