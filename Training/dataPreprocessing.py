@@ -270,7 +270,7 @@ def load_data(train_file : str, sequence_length=48, train_size : float = 0.7, va
     df = df.sort_values(by="observation_date").reset_index(drop=True)
 
     target_col = "fred_PCEPI"
-    df = add_lagged_features(df, target_col)
+    df = add_lagged_features(df, [target_col])
     df = add_rolling_features(df, target_col)
     df = add_time_features(df)
 
