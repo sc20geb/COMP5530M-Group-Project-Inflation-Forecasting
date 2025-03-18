@@ -147,7 +147,7 @@ def add_modified_feature(df, target_col, func):
     df[f"{func.__name__}_{target_col}"] = func(df[target_col])
     return df
 
-def create_sequences(data, exog, fft_real, fft_imag, target, seq_len, config):
+def create_sequences(data, target, seq_len, exog=None, fft_real=None, fft_imag=None, config={'use_fft': False, 'use_exog': False}):
     """
     Creates sequences dynamically based on the provided configuration.
 
@@ -170,7 +170,7 @@ def create_sequences(data, exog, fft_real, fft_imag, target, seq_len, config):
         seq_data = data[i : i + seq_len].flatten()
         
         # Apply Fourier Transform if enabled in config
-        if config.get("use_fft", False):
+        if config.get("use_fft", False) and fft_real is not None and fft_imag is not None:
             seq_data = np.hstack([seq_data, fft_real[i], fft_imag[i]])  
 
         # Include exogenous variables if enabled
@@ -305,9 +305,9 @@ def load_data(train_file : str, sequence_length=48, train_size : float = 0.7, va
         X_exog_valid = exog_scaler.transform(exog_data[len(X_train):len(X_train) + len(X_valid)])
         X_exog_test = exog_scaler.transform(exog_data[len(X_train) + len(X_valid):])
     
-        X_train_seq, X_exog_train_seq, y_train_seq = create_sequences(X_train, X_exog_train, train_fft_real, train_fft_imag, y_train, sequence_length, config)
-        X_valid_seq, X_exog_valid_seq, y_valid_seq = create_sequences(X_valid, X_exog_valid, valid_fft_real, valid_fft_imag, y_valid, sequence_length, config)
-        X_test_seq, X_exog_test_seq, y_test_seq = create_sequences(X_test, X_exog_test, test_fft_real, test_fft_imag, y_test, sequence_length, config)
+        X_train_seq, X_exog_train_seq, y_train_seq = create_sequences(X_train, y_train, sequence_length, exog=X_exog_train, fft_real=train_fft_real, fft_imag=train_fft_imag, config=config)
+        X_valid_seq, X_exog_valid_seq, y_valid_seq = create_sequences(X_valid, y_valid, sequence_length, exog=X_exog_valid, fft_real=valid_fft_real, fft_imag=valid_fft_imag, config=config)
+        X_test_seq, X_exog_test_seq, y_test_seq = create_sequences(X_test, y_test, sequence_length, exog=X_exog_test, fft_real=test_fft_real, fft_imag=test_fft_imag, config=config)
     
         return X_train_seq, X_exog_train_seq, y_train_seq, \
                X_valid_seq, X_exog_valid_seq, y_valid_seq, \
@@ -315,9 +315,9 @@ def load_data(train_file : str, sequence_length=48, train_size : float = 0.7, va
                df["observation_date"].iloc[sequence_length:], X_scaler, exog_scaler, y_scaler
 
     # If no exogenous variables exist, return only X and y
-    X_train_seq, y_train_seq = create_sequences(X_train, None, train_fft_real, train_fft_imag, y_train, sequence_length, config)
-    X_valid_seq, y_valid_seq = create_sequences(X_valid, None, valid_fft_real, valid_fft_imag, y_valid, sequence_length, config)
-    X_test_seq, y_test_seq = create_sequences(X_test, None, test_fft_real, test_fft_imag, y_test, sequence_length, config)
+    X_train_seq, y_train_seq = create_sequences(X_train, y_train, sequence_length, fft_real=train_fft_real, fft_imag=train_fft_imag, config=config)
+    X_valid_seq, y_valid_seq = create_sequences(X_valid, y_valid, sequence_length, fft_real=valid_fft_real, fft_imag=valid_fft_imag, config=config)
+    X_test_seq, y_test_seq = create_sequences(X_test, y_test, sequence_length, fft_real=test_fft_real, fft_imag=test_fft_imag, config=config)
         
     return X_train_seq, y_train_seq, \
         X_valid_seq, y_valid_seq, \
