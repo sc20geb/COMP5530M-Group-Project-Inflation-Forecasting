@@ -48,9 +48,9 @@ def apply_fft_per_sequence(data, seq_len, num_components=10):
         fft_imag.append(np.log1p(np.abs(np.imag(fft_transformed[:num_components]))))
     return np.array(fft_real), np.array(fft_imag)
 
-def add_lagged_features(df, target_col, lags=[1, 3, 6]):
+def add_lagged_features(df, target_cols, lags=[1, 3, 6]):
     '''
-    Generates lagged features for the given target column.
+    Generates lagged features for the given target column(s).
     
     Lagging means shifting the values of the target column by a certain number of time steps 
     to create past observations as features. This helps the model learn from previous values.
@@ -59,8 +59,8 @@ def add_lagged_features(df, target_col, lags=[1, 3, 6]):
     -----------
     df: pandas DataFrame
         The input DataFrame containing the target column.
-    target_col: str
-        The name of the target column for which lag features are created.
+    target_col: list[str]
+        The name(s) of the target column(s) for which lag features are created.
     lags: list of int
         A list of lag values indicating how many time steps back to shift the data.
 
@@ -69,8 +69,9 @@ def add_lagged_features(df, target_col, lags=[1, 3, 6]):
     df: pandas DataFrame
         The DataFrame with additional lagged columns.
     '''
-    for lag in lags:
-        df[f"{target_col}_lag{lag}"] = df[target_col].shift(lag)
+    for t_col in target_cols:
+        for lag in lags:
+            df[f"{t_col}_lag{lag}"] = df[t_col].shift(lag)
     return df
 
 def add_rolling_features(df, target_col, windows=[3, 6, 12]):
@@ -358,14 +359,16 @@ def best_lag_selection(train_series : sm.tools.typing.ArrayLike1D, max_lags : in
 
     Parameters:
     -----------
-    X: numpy array, time-series input data.
-    y: numpy array, time-series target data.
-    X_exog (optional): numpy array, exogenous variable input.
-    batch_size: int, size of batches.
+    train_series: 1D array-like
+        Series containing the training target data.
+    max_lags: integer
+        The maximum number of lags to be checked with the AR model.
+    verbose: boolean
+        Whether or not the best lags found by partial autocorrelation and the AR model respectively are printed.
 
     Returns:
     --------
-    Integer 'best_lag'.
+    Integer best lag.
     """
     pacf_vals = pacf(train_series, nlags=max_lags)
     best_pacf_lag = np.argmax(np.abs(pacf_vals[1:])) + 1
@@ -435,3 +438,27 @@ def sklearn_fit_transform(train_df, test_df, sklearn_func, **func_kwargs):
 
     new_cols = [f"{sklearn_func.__name__}_{i+1}" for i in range(transformed_train.shape[1])]
     return pd.DataFrame(transformed_train, index=train_df.index, columns=new_cols), pd.DataFrame(transformed_test,  index=test_df.index,  columns=new_cols)
+
+def integer_index(dfs):
+    """
+    Changes the index of the provided DataFrame(s) to be integers in the range [0, len(dataframe)].
+    If a list of DataFrame objects is provided, returns a list of integer-index-converted dataframes.
+
+    Parameters:
+    -----------
+    dfs: list[DataFrame] or DataFrame
+        (potentially several) DataFrame(s) to be converted to an integer index.
+
+    Returns:
+    --------
+    list[DataFrame] or DataFrame - the DataFrame(s) input with their index replaced with integers.
+    """
+    if type(dfs) != list: dfs = [dfs]
+    returns = []
+    for df in dfs:
+        int_index = np.arange(len(df))
+        df_copy = df.copy()
+        df_copy.index = int_index
+        returns.append(df_copy)
+    if len(returns) == 1: return returns[0]
+    return returns
