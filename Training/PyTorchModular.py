@@ -3,8 +3,14 @@ from tqdm.autonotebook import tqdm
 import matplotlib.pyplot as plt
 from EarlyStopping import EarlyStopping
 import time
-import pickle
 import os
+import torch.nn as nn
+import torch.optim as optim
+import optuna
+from hyperparameters import OPTUNA_SEARCH_SPACE
+import numpy as np
+import pandas as pd
+from sklearn.metrics import mean_squared_error
 
 
 def train_epoch(
@@ -287,17 +293,6 @@ def loss_curve(trainLoss: list, validLoss: list, title: str = None):
     plt.grid(True)
     plt.show()
 
-
-
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import optuna
-import os
-from tqdm.autonotebook import tqdm
-from EarlyStopping import EarlyStopping
-from hyperparameters import OPTUNA_SEARCH_SPACE, tune_hyperparameters
-
 def optuna_tune_and_train(
     model_class,  # Any model class (GRU, LSTM, Transformer, etc.)
     train_loader,
@@ -308,6 +303,7 @@ def optuna_tune_and_train(
     model_name="Model",
     use_best_hyperparams=False,  # Set False to force a fresh Optuna run
     n_trials=20,  # Number of Optuna trials
+    verbose=False  # Whether or not to print out progress
 ):
     """
     Runs Optuna hyperparameter tuning and trains the model with the best parameters.
@@ -333,35 +329,24 @@ def optuna_tune_and_train(
         model.train()
         
         for epoch in range(num_epochs):
-            train_loss = 0.0
-            for inputs, targets in train_loader:
-                inputs, targets = inputs.to(device), targets.to(device)
-                inputs = inputs.unsqueeze(-1) if inputs.ndim == 2 else inputs
+            # Use extant function to train for one epoch, reporting back the average loss on each item
+            avg_loss = train_epoch(model, train_loader, criterion, optimizer, device)
 
-                outputs = model(inputs)
-
-                optimizer.zero_grad()
-                loss = criterion(outputs, targets)
-                loss.backward()
-                optimizer.step()
-                train_loss += loss.item() * inputs.size(0)
-            
-            total_loss = train_loss / len(train_loader.dataset)
-            trial.report(total_loss, epoch)
+            trial.report(avg_loss, epoch)
 
             # Handle pruning (early stopping within Optuna)
             if trial.should_prune():
                 raise optuna.exceptions.TrialPruned()
 
-        return total_loss
+        return avg_loss
 
     # Run Optuna trials
-    print(" Running Optuna hyperparameter tuning...")
+    if verbose: print(" Running Optuna hyperparameter tuning...")
     study.optimize(objective, n_trials=n_trials)
 
     # Get Best Hyperparameters
     best_params = study.best_params
-    print(f" Best hyperparameters found: {best_params}")
+    if verbose: print(f" Best hyperparameters found: {best_params}")
 
     # Step 2: Train Model with Best Hyperparameters
     model = model_class(
@@ -388,16 +373,10 @@ def optuna_tune_and_train(
     )
 
     # Save Final Model
-    torch.save(model.state_dict(), f"{model_save_path}/{model_name}.pth")
-    print(" Model training complete and saved!")
+    torch.save(model.state_dict(), os.path.join(model_save_path, f'{model_name}.pth'))
+    if verbose: print(" Model training complete and saved!")
 
     return model, metadata
-
-import torch
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.metrics import mean_squared_error
 
 def evaluate_model(model, val_loader, y_scaler, observation_dates, device):
     """

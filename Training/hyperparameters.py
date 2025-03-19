@@ -5,7 +5,7 @@ import optuna
 import json
 import os
 
-# Define search space
+# Define GRU search space
 OPTUNA_SEARCH_SPACE = {
     "hidden_size": (32, 256),
     "num_layers": (1, 4),
@@ -15,19 +15,19 @@ OPTUNA_SEARCH_SPACE = {
 BEST_HYPERPARAMETERS_FILE = "best_hyperparameters.json"  # Store best params
 BEST_HYPERPARAMETERS = None  # Cached best params
 
-def save_best_hyperparameters(best_params):
+def save_best_hyperparameters(best_params, verbose=False):
     """Save best hyperparameters to a JSON file."""
     with open(BEST_HYPERPARAMETERS_FILE, "w") as f:
         json.dump(best_params, f)
-    print(" Best hyperparameters saved!")
+    if verbose: print(" Best hyperparameters saved!")
 
-def load_best_hyperparameters():
+def load_best_hyperparameters(verbose=False):
     """Load best hyperparameters from file."""
     global BEST_HYPERPARAMETERS
     if os.path.exists(BEST_HYPERPARAMETERS_FILE):
         with open(BEST_HYPERPARAMETERS_FILE, "r") as f:
             BEST_HYPERPARAMETERS = json.load(f)
-        print(" Loaded best hyperparameters:", BEST_HYPERPARAMETERS)
+        if verbose: print(" Loaded best hyperparameters:", BEST_HYPERPARAMETERS)
     return BEST_HYPERPARAMETERS
 
 def tune_hyperparameters(objective, n_trials=20):

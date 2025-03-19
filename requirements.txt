@@ -10,3 +10,4 @@ pytorch-forecasting==1.3.0
 jupyter==1.1.1
 seaborn==0.13.2
 pykalman==0.10.1
+optuna==4.2.1
