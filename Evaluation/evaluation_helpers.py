@@ -38,9 +38,11 @@ def make_evaluation_predictions(model: torch.nn.Module, val_loader: torch.utils.
     actuals = []
 
     with torch.no_grad():
-        for inputs, targets in val_loader:
-            inputs = inputs.to(device)
-            outputs = model(inputs)
+        # Can capture multiple inputs (e.g., if the model takes exogenous variables)
+        for *inputs, targets in val_loader:
+            inputs = [input.to(device) for input in inputs]
+            targets = targets.to(device)
+            outputs = model(*inputs)
             predictions.append(outputs.cpu().numpy())
             actuals.append(targets.cpu().numpy())
 

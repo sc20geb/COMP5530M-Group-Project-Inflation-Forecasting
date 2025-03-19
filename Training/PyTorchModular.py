@@ -48,21 +48,24 @@ def train_epoch(
     nSamples = 0  # accumulates number of samples per epoch (divides the total loss to find average loss)
 
     # loop over each batch:
-    for batch, (X, Y) in enumerate(dataLoader):
+    for batch, batch_data in enumerate(dataLoader):
 
-        # Put the data on the appropiate device:
-        X = X.to(device)
-        Y = Y.to(device)
+        # Unpacks batch data into inputs and targets; can handle arbitrary numbers of inputs
+        *inputs, targets = batch_data
+
+        # Put the data on the appropriate device
+        inputs = [input.to(device) for input in inputs]
+        targets = targets.to(device)
 
         # Forward pass:
-        y_pred = model(X)
+        y_pred = model(*inputs)
 
         # Calculate the loss:
-        loss = lossFn(y_pred, Y)
+        loss = lossFn(y_pred, targets)
 
         # Update training loss:
-        trainLoss += loss.item() * Y.shape[0]
-        nSamples += Y.shape[0]
+        trainLoss += loss.item() * targets.shape[0]
+        nSamples += targets.shape[0]
 
         # Remove previous gradients:
         optimizer.zero_grad()
@@ -116,19 +119,21 @@ def validate_logits(
 
     # Loop over each batch in the validation set.
     with torch.inference_mode():
-        for batch, (X, Y) in enumerate(dataLoader):
+        for batch, batch_data in enumerate(dataLoader):
+            # Unpacks batch data into inputs and targets; can handle arbitrary numbers of inputs
+            *inputs, targets = batch_data
 
-            # Put the data on the appropiate device:
-            X = X.to(device)
-            Y = Y.to(device)
+            # Put the data on the appropriate device
+            inputs = [input.to(device) for input in inputs]
+            targets = targets.to(device)
 
             # Get the predicted Logits
-            logits = model(X)
+            logits = model(*inputs)
 
             # calculate the loss:
-            loss = lossFn(logits, Y)
-            validLoss += loss.item() * Y.shape[0]
-            nSamples += Y.shape[0]
+            loss = lossFn(logits, targets)
+            validLoss += loss.item() * targets.shape[0]
+            nSamples += targets.shape[0]
             # TODO: Implement torch metrics feature:
 
     return validLoss / nSamples
@@ -182,6 +187,7 @@ def train_model(
         "trainLoss": [],
         "validLoss": [],
         "times": [],
+        "best_model_path": "",
     }
 
     stopper = EarlyStopping()
@@ -195,52 +201,29 @@ def train_model(
         model.train()
         train_loss = 0
 
+        #TODO: Have this use train_epoch
         for batch, batch_data in enumerate(dataLoaderTrain):
-            if len(batch_data) == 3:  # Case where exogenous variables exist
-                X, X_exog, Y = batch_data
-                X, X_exog, Y = X.to(device), X_exog.to(device), Y.to(device)
-                y_pred = model(X, X_exog)
-            else:  # Case where only X, Y exist (no exogenous variables)
-                X, Y = batch_data
-                X, Y = X.to(device), Y.to(device)
-                y_pred = model(X)
+            # Unpacks batch data into inputs and targets; can handle arbitrary numbers of inputs
+            *inputs, targets = batch_data
+            inputs = [input.to(device) for input in inputs]
+            targets = targets.to(device)
+            y_pred = model(*inputs)
 
             optimizer.zero_grad()
-            loss = lossFn(y_pred, Y)
+            loss = lossFn(y_pred, targets)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             train_loss += loss.item()
 
             #inform user of the current batch number when requested
-            if batchStatusUpdate:
-                if batch % batchStatusUpdate == 0:
-                    print(f"\tBatch: {batch}")
+            if batchStatusUpdate and batch % batchStatusUpdate == 0:
+                print(f"\tBatch: {batch}")
 
         train_loss /= len(dataLoaderTrain)
         metaData["trainLoss"].append(train_loss)
 
-        model.eval()
-        valid_loss = 0
-        with torch.inference_mode():
-            for batch in dataLoaderValid:
-                if len(batch) == 3:  # Exogenous variables present
-                    X, X_exog, Y = batch
-                    X, X_exog, Y = X.to(device), X_exog.to(device), Y.to(device)
-                    y_pred = model(X, X_exog)
-                else:  # No exogenous variables
-                    X, Y = batch
-                    X, Y = X.to(device), Y.to(device)
-                    y_pred = model(X)
-
-                loss = lossFn(y_pred, Y)
-                valid_loss += loss.item() * Y.shape[0]
-
-        valid_loss /= len(dataLoaderValid)
-        # Ensure 'data' is a dictionary
-        if not isinstance(metaData, dict): 
-            raise TypeError("Expected 'metaData' to be a dictionary, but got: ", type(metaData)) 
-        
+        valid_loss = validate_logits(model, dataLoaderValid, lossFn, device)
         metaData["validLoss"].append(valid_loss)
         metaData["times"].append(time.time() - t0)
 
@@ -307,7 +290,7 @@ def optuna_tune_and_train(
     """
 
     # Step 1: Run Optuna Hyperparameter Tuning
-    study = optuna.create_study(direction="minimize")
+    study = optuna.create_study(direction="minimize", study_name=f'{model_name if model_name != 'Model' else model_class.__name__}_hyperparameter_optimisation')
 
     def objective(trial):
         """Objective function for Optuna hyperparameter tuning."""
