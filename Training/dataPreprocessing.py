@@ -325,7 +325,7 @@ def load_data(train_file : str, sequence_length=48, train_size : float = 0.7, va
         df["observation_date"].iloc[sequence_length:], y_scaler
 
 
-def prepare_dataloader(X, y, X_exog=None, batch_size=32):
+def prepare_dataloader(X, y, X_exog=None, shuffle=True, batch_size=32):
     """
     Converts dataset, optionally with exogenous variables, into PyTorch DataLoader.
 
@@ -334,7 +334,8 @@ def prepare_dataloader(X, y, X_exog=None, batch_size=32):
     X: numpy array, time-series input data.
     y: numpy array, time-series target data.
     X_exog (optional): numpy array, exogenous variable input.
-    batch_size: int, size of batches.
+    shuffle (optional): boolean, shuffle argument for DataLoader.
+    batch_size (optional): int, size of batches.
 
     Returns:
     --------
@@ -349,7 +350,7 @@ def prepare_dataloader(X, y, X_exog=None, batch_size=32):
     else:
         dataset = TensorDataset(X_tensor, y_tensor)
 
-    return DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
 def best_lag_selection(train_series : sm.tools.typing.ArrayLike1D, max_lags : int = 12, verbose: bool = False) -> int:
     """

@@ -1,9 +1,12 @@
 import torch
-import numpy as np
 import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 from glob import glob
+from sklearn.metrics import mean_squared_error
 
-def make_evaluation_predictions(model: torch.nn.Module, savepath: str, val_loader: torch.utils.data.DataLoader, device=None, y_scaler=None):
+def make_evaluation_predictions(model: torch.nn.Module, val_loader: torch.utils.data.DataLoader, savepath: str = '', device=None, y_scaler=None):
     """
     Loads the model at the savepath specified, and evaluates it using the data held in val_loader.
 
@@ -11,10 +14,10 @@ def make_evaluation_predictions(model: torch.nn.Module, savepath: str, val_loade
     -----------
     model: torch.nn.Module
         Module object into which to load the weights at the specified savepath.
-    savepath: str
-        Defines the location of the file containing the weights of the model to be loaded.
     val_loader: torch.utils.data.DataLoader
         The DataLoader that provides the evaluation data.
+    savepath: str (optional)
+        Defines the location of the file containing the weights of the model to be loaded. If not provided, it is assumed the model is already trained.
     device: str (optional)
         Idenfities the device to be used when evaluating the model. If not provided, this is identified automatically.
     y_scaler: sklearn.preprocessing.Scaler (optional)
@@ -28,7 +31,7 @@ def make_evaluation_predictions(model: torch.nn.Module, savepath: str, val_loade
     if not device:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model.load_state_dict(torch.load(savepath))
+    if savepath: model.load_state_dict(torch.load(savepath))
     model = model.to(device)
     model.eval()
     predictions = []
@@ -51,6 +54,67 @@ def make_evaluation_predictions(model: torch.nn.Module, savepath: str, val_loade
         actuals = y_scaler.inverse_transform(actuals)
 
     return predictions, actuals
+
+def evaluate_model(model, val_loader, y_scaler, observation_dates, device, savepath : str = '', verbose=False):
+    """
+    Evaluates a trained model on validation data.
+
+    Parameters:
+    -----------
+    model: torch.nn.Module
+        The trained PyTorch model to evaluate. (if savepath is passed, weights from that file are loaded into this object)
+    val_loader: DataLoader
+        DataLoader containing validation data.
+    y_scaler: Scaler object
+        The scaler used for inverse transforming predictions.
+    observation_dates: list or pd.Series
+        The dates corresponding to validation predictions.
+    device: torch.device
+        The device to run predictions on (CPU/GPU).
+    savepath: str (optional)
+        Defines the location of the file containing the weights of the model to be loaded. If not provided, it is assumed the model is already trained.
+    verbose: boolean (optional)
+        Whether or not to print progress updates/ outputs.
+
+    Returns:
+    --------
+    df_comparison: pd.DataFrame
+        DataFrame containing actual vs predicted values.
+    rmse: float
+        Root Mean Squared Error (RMSE).
+    """
+    predictions_inv, actuals_inv = make_evaluation_predictions(model, val_loader, savepath=savepath, device=device, y_scaler=y_scaler)
+
+    # Extract the dates for validation predictions
+    val_dates = observation_dates[-len(actuals_inv):]
+
+    # Create a DataFrame for comparison
+    df_comparison = pd.DataFrame({
+        "Date": val_dates,
+        "Actual Inflation": actuals_inv.flatten(),
+        "Predicted Inflation": predictions_inv.flatten()
+    })
+
+    # Display the first few rows of the comparison DataFrame
+    if verbose: print(df_comparison.head())
+
+    # Plot actual vs predicted Inflation values
+    plt.figure(figsize=(12, 6))
+    plt.plot(df_comparison["Date"], df_comparison["Actual Inflation"], label='Actual Inflation', linestyle='-', linewidth=2)
+    plt.plot(df_comparison["Date"], df_comparison["Predicted Inflation"], label='Predicted Inflation', linestyle='--', linewidth=2)
+    plt.xlabel("Date")
+    plt.ylabel("Inflation")
+    plt.title("Comparison of Actual vs. Predicted Inflation")
+    plt.xticks(rotation=45)
+    plt.legend()
+    plt.grid(True)
+    if verbose: plt.show()
+
+    # Compute RMSE for validation predictions
+    rmse = np.sqrt(mean_squared_error(actuals_inv, predictions_inv))
+    if verbose: print(f" Root Mean Squared Error (RMSE): {rmse:.6f}")
+
+    return df_comparison, rmse
 
 def get_best_path(savepath : str, model_name : str, stopped_at=-1) -> str:
     """

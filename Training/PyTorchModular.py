@@ -1,16 +1,13 @@
+import time
+import os
+import optuna
 import torch
+import torch.nn as nn
+import torch.optim as optim
 from tqdm.autonotebook import tqdm
 import matplotlib.pyplot as plt
 from EarlyStopping import EarlyStopping
-import time
-import os
-import torch.nn as nn
-import torch.optim as optim
-import optuna
 from hyperparameters import OPTUNA_SEARCH_SPACE
-import numpy as np
-import pandas as pd
-from sklearn.metrics import mean_squared_error
 
 
 def train_epoch(
@@ -377,77 +374,3 @@ def optuna_tune_and_train(
     if verbose: print(" Model training complete and saved!")
 
     return model, metadata
-
-def evaluate_model(model, val_loader, y_scaler, observation_dates, device):
-    """
-    Evaluates a trained model on validation data.
-
-    Parameters:
-    -----------
-    model: torch.nn.Module
-        The trained PyTorch model to evaluate.
-    val_loader: DataLoader
-        DataLoader containing validation data.
-    y_scaler: Scaler object
-        The scaler used for inverse transforming predictions.
-    observation_dates: list or pd.Series
-        The dates corresponding to validation predictions.
-    device: torch.device
-        The device to run predictions on (CPU/GPU).
-
-    Returns:
-    --------
-    df_comparison: pd.DataFrame
-        DataFrame containing actual vs predicted values.
-    rmse: float
-        Root Mean Squared Error (RMSE).
-    """
-    model.eval()
-    predictions, actuals = [], []
-
-    with torch.no_grad():
-        for inputs, targets in val_loader:
-            inputs, targets = inputs.to(device), targets.to(device)
-            inputs = inputs.unsqueeze(-1) if inputs.ndim == 2 else inputs
-            outputs = model(inputs)
-
-            predictions.append(outputs.cpu().numpy())
-            actuals.append(targets.cpu().numpy())
-
-    # Convert predictions and actuals to original scale
-    predictions = np.concatenate(predictions)
-    actuals = np.concatenate(actuals)
-
-    predictions_inv = y_scaler.inverse_transform(predictions)
-    actuals_inv = y_scaler.inverse_transform(actuals)
-
-    # Extract the dates for validation predictions
-    val_dates = observation_dates[-len(actuals_inv):]
-
-    # Create a DataFrame for comparison
-    df_comparison = pd.DataFrame({
-        "Date": val_dates,
-        "Actual Inflation": actuals_inv.flatten(),
-        "Predicted Inflation": predictions_inv.flatten()
-    })
-
-    # Display the first few rows of the comparison DataFrame
-    print(df_comparison.head())
-
-    # Plot actual vs predicted Inflation values
-    plt.figure(figsize=(12, 6))
-    plt.plot(df_comparison["Date"], df_comparison["Actual Inflation"], label='Actual Inflation', linestyle='-', linewidth=2)
-    plt.plot(df_comparison["Date"], df_comparison["Predicted Inflation"], label='Predicted Inflation', linestyle='--', linewidth=2)
-    plt.xlabel("Date")
-    plt.ylabel("Inflation")
-    plt.title("Comparison of Actual vs. Predicted Inflation")
-    plt.xticks(rotation=45)
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-    # Compute RMSE for validation predictions
-    rmse = np.sqrt(mean_squared_error(actuals_inv, predictions_inv))
-    print(f" Root Mean Squared Error (RMSE): {rmse:.6f}")
-
-    return df_comparison, rmse
