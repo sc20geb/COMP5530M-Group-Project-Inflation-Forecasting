@@ -286,3 +286,189 @@ def loss_curve(trainLoss: list, validLoss: list, title: str = None):
     plt.legend()
     plt.grid(True)
     plt.show()
+
+
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import optuna
+import os
+from tqdm.autonotebook import tqdm
+from EarlyStopping import EarlyStopping
+from hyperparameters import OPTUNA_SEARCH_SPACE, tune_hyperparameters
+
+def optuna_tune_and_train(
+    model_class,  # Any model class (GRU, LSTM, Transformer, etc.)
+    train_loader,
+    val_loader,
+    device,
+    max_epochs=50,
+    model_save_path="models",
+    model_name="Model",
+    use_best_hyperparams=False,  # Set False to force a fresh Optuna run
+    n_trials=20,  # Number of Optuna trials
+):
+    """
+    Runs Optuna hyperparameter tuning and trains the model with the best parameters.
+    """
+
+    # Step 1: Run Optuna Hyperparameter Tuning
+    study = optuna.create_study(direction="minimize")
+
+    def objective(trial):
+        """Objective function for Optuna hyperparameter tuning."""
+        hidden_size = trial.suggest_int("hidden_size", *OPTUNA_SEARCH_SPACE["hidden_size"])
+        num_layers = trial.suggest_int("num_layers", *OPTUNA_SEARCH_SPACE["num_layers"])
+        learning_rate = trial.suggest_float("lr", *OPTUNA_SEARCH_SPACE["lr"], log=True)
+
+        # Initialize model
+        model = model_class(input_size=1, hidden_size=hidden_size, num_layers=num_layers, output_size=1).to(device)
+        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+        criterion = nn.MSELoss()
+
+        # Train for a few epochs to evaluate performance
+        num_epochs = 10  # Shorter tuning period
+        total_loss = 0
+        model.train()
+        
+        for epoch in range(num_epochs):
+            train_loss = 0.0
+            for inputs, targets in train_loader:
+                inputs, targets = inputs.to(device), targets.to(device)
+                inputs = inputs.unsqueeze(-1) if inputs.ndim == 2 else inputs
+
+                outputs = model(inputs)
+
+                optimizer.zero_grad()
+                loss = criterion(outputs, targets)
+                loss.backward()
+                optimizer.step()
+                train_loss += loss.item() * inputs.size(0)
+            
+            total_loss = train_loss / len(train_loader.dataset)
+            trial.report(total_loss, epoch)
+
+            # Handle pruning (early stopping within Optuna)
+            if trial.should_prune():
+                raise optuna.exceptions.TrialPruned()
+
+        return total_loss
+
+    # Run Optuna trials
+    print(" Running Optuna hyperparameter tuning...")
+    study.optimize(objective, n_trials=n_trials)
+
+    # Get Best Hyperparameters
+    best_params = study.best_params
+    print(f" Best hyperparameters found: {best_params}")
+
+    # Step 2: Train Model with Best Hyperparameters
+    model = model_class(
+        input_size=1,
+        hidden_size=best_params["hidden_size"],
+        num_layers=best_params["num_layers"],
+        output_size=1
+    ).to(device)
+
+    optimizer = optim.Adam(model.parameters(), lr=best_params["lr"])
+    lossFn = nn.MSELoss()
+
+    metadata = train_model(
+        model=model,
+        maxEpochs=max_epochs,
+        modelSavePath=model_save_path,
+        modelName=model_name,
+        dataLoaderTrain=train_loader,
+        dataLoaderValid=val_loader,
+        lossFn=lossFn,
+        optimizer=optimizer,
+        device=device,
+        verbose=True
+    )
+
+    # Save Final Model
+    torch.save(model.state_dict(), f"{model_save_path}/{model_name}.pth")
+    print(" Model training complete and saved!")
+
+    return model, metadata
+
+import torch
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.metrics import mean_squared_error
+
+def evaluate_model(model, val_loader, y_scaler, observation_dates, device):
+    """
+    Evaluates a trained model on validation data.
+
+    Parameters:
+    -----------
+    model: torch.nn.Module
+        The trained PyTorch model to evaluate.
+    val_loader: DataLoader
+        DataLoader containing validation data.
+    y_scaler: Scaler object
+        The scaler used for inverse transforming predictions.
+    observation_dates: list or pd.Series
+        The dates corresponding to validation predictions.
+    device: torch.device
+        The device to run predictions on (CPU/GPU).
+
+    Returns:
+    --------
+    df_comparison: pd.DataFrame
+        DataFrame containing actual vs predicted values.
+    rmse: float
+        Root Mean Squared Error (RMSE).
+    """
+    model.eval()
+    predictions, actuals = [], []
+
+    with torch.no_grad():
+        for inputs, targets in val_loader:
+            inputs, targets = inputs.to(device), targets.to(device)
+            inputs = inputs.unsqueeze(-1) if inputs.ndim == 2 else inputs
+            outputs = model(inputs)
+
+            predictions.append(outputs.cpu().numpy())
+            actuals.append(targets.cpu().numpy())
+
+    # Convert predictions and actuals to original scale
+    predictions = np.concatenate(predictions)
+    actuals = np.concatenate(actuals)
+
+    predictions_inv = y_scaler.inverse_transform(predictions)
+    actuals_inv = y_scaler.inverse_transform(actuals)
+
+    # Extract the dates for validation predictions
+    val_dates = observation_dates[-len(actuals_inv):]
+
+    # Create a DataFrame for comparison
+    df_comparison = pd.DataFrame({
+        "Date": val_dates,
+        "Actual Inflation": actuals_inv.flatten(),
+        "Predicted Inflation": predictions_inv.flatten()
+    })
+
+    # Display the first few rows of the comparison DataFrame
+    print(df_comparison.head())
+
+    # Plot actual vs predicted Inflation values
+    plt.figure(figsize=(12, 6))
+    plt.plot(df_comparison["Date"], df_comparison["Actual Inflation"], label='Actual Inflation', linestyle='-', linewidth=2)
+    plt.plot(df_comparison["Date"], df_comparison["Predicted Inflation"], label='Predicted Inflation', linestyle='--', linewidth=2)
+    plt.xlabel("Date")
+    plt.ylabel("Inflation")
+    plt.title("Comparison of Actual vs. Predicted Inflation")
+    plt.xticks(rotation=45)
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    # Compute RMSE for validation predictions
+    rmse = np.sqrt(mean_squared_error(actuals_inv, predictions_inv))
+    print(f" Root Mean Squared Error (RMSE): {rmse:.6f}")
+
+    return df_comparison, rmse
