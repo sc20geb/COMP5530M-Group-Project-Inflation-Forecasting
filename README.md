@@ -42,6 +42,5 @@ Repository for group 12's 2024/25 academic year COMP5530M group project on infla
   - git switch "\<branchname>"
 
 ## File Naming Conventions:  (can be changed)
-- "{ModelName}_{info}.{}"
+- "{ModelName}_{info}.{pth|pkl}"
 - Make sure weights file is the same name as the model in the "Weights" folder
-- Save model weights as "{ModelName}.pth" or Save Model as "{ModelName}.pkl" for stats model.
