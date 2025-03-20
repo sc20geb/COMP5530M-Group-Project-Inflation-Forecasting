@@ -6,24 +6,30 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from torch.utils.data import DataLoader, TensorDataset
 from statsmodels.tsa.stattools import pacf
 import statsmodels.api as sm
+import logging
 
-def minMaxScale(vals : np.array) -> np.array:
-    '''
-    Performs min-max scaling on the provided numpy array
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+def minMaxScale(vals: np.array) -> np.array:
+    """
+    Applies Min-Max scaling to normalize the input array between 0 and 1.
 
     Parameters:
     -----------
-    vals: numpy array on which to perform scaling
+    vals: numpy array
+        The input array to be scaled.
 
     Returns:
     --------
-    min-max scaled numpy array
-    '''
-    return (vals - np.min(vals)) / (np.max(vals) - np.min(vals))
+    numpy array
+        The min-max scaled version of the input array.
+    """
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    return scaler.fit_transform(vals.reshape(-1, 1)).flatten()
 
 def apply_fft_per_sequence(data, seq_len, num_components=10):
-    '''
-    Applies Fast Fourier Transform (FFT) to each sequence in the input time-series data 
+    """
+    Computes the Fast Fourier Transform (FFT) for each sequence in the input time-series data 
     and extracts the real and imaginary components.
 
     Parameters:
@@ -31,48 +37,49 @@ def apply_fft_per_sequence(data, seq_len, num_components=10):
     data: numpy array
         The input time-series data, where each row represents a timestamp.
     seq_len: int
-        The length of each sequence for which FFT is applied. Determines how many past 
+        The length of each sequence for which FFT is applied, determining how many past 
         values are considered in the transformation.
+    num_components: int, default=10
+        The number of FFT components to retain from both the real and imaginary parts.
 
     Returns:
     --------
     fft_real: numpy array
-        Log-transformed absolute values of the real component of the FFT.
+        Log-transformed absolute values of the real components of the FFT.
     fft_imag: numpy array
-        Log-transformed absolute values of the imaginary component of the FFT.
-    '''
-    fft_real, fft_imag = [], []
-    for i in range(len(data) - seq_len):
-        fft_transformed = fft(data[i : i + seq_len].flatten())
-        fft_real.append(np.log1p(np.abs(np.real(fft_transformed[:num_components]))))
-        fft_imag.append(np.log1p(np.abs(np.imag(fft_transformed[:num_components]))))
-    return np.array(fft_real), np.array(fft_imag)
+        Log-transformed absolute values of the imaginary components of the FFT.
+    """
+    def compute_fft(seq):
+        transformed = fft(seq.flatten())
+        return np.hstack([
+            np.log1p(np.abs(np.real(transformed[:num_components]))),
+            np.log1p(np.abs(np.imag(transformed[:num_components])))
+        ])
+    
+    fft_features = np.apply_along_axis(compute_fft, axis=1, arr=np.lib.stride_tricks.sliding_window_view(data, (seq_len, data.shape[1])))
+    return fft_features[:, :num_components], fft_features[:, num_components:]
 
 def add_lagged_features(df, target_cols, lags=[1, 3, 6]):
-    '''
-    Generates lagged features for the given target column(s).
-    
-    Lagging means shifting the values of the target column by a certain number of time steps 
-    to create past observations as features. This helps the model learn from previous values.
+    """
+    Creates lagged features for the specified target column(s) by shifting values 
+    backward in time, allowing the model to incorporate past observations as input.
 
     Parameters:
     -----------
     df: pandas DataFrame
-        The input DataFrame containing the target column.
-    target_col: list[str]
-        The name(s) of the target column(s) for which lag features are created.
-    lags: list of int
-        A list of lag values indicating how many time steps back to shift the data.
+        The input DataFrame containing the target column(s).
+    target_cols: list[str]
+        A list of target column names for which lag features should be created.
+    lags: list of int, default=[1, 3, 6]
+        A list of lag values specifying how many time steps back to shift the data.
 
     Returns:
     --------
-    df: pandas DataFrame
-        The DataFrame with additional lagged columns.
-    '''
-    for t_col in target_cols:
-        for lag in lags:
-            df[f"{t_col}_lag{lag}"] = df[t_col].shift(lag)
-    return df
+    pandas DataFrame
+        The original DataFrame with additional lagged feature columns.
+    """
+    lagged_data = {f"{t_col}_lag{lag}": df[t_col].shift(lag) for t_col in target_cols for lag in lags}
+    return df.assign(**lagged_data)
 
 def add_rolling_features(df, target_col, windows=[3, 6, 12]):
     '''
@@ -101,11 +108,10 @@ def add_rolling_features(df, target_col, windows=[3, 6, 12]):
     return df
 
 def add_time_features(df):
-    '''
-    Extracts and adds time-based features from the 'observation_date' column.
-
-    Time-based features help the model capture seasonal trends, economic cycles, 
-    and other time-dependent variations in the data.
+    """
+    Extracts and adds time-based features from the 'observation_date' column to 
+    enhance the model's ability to capture seasonal patterns, economic cycles, 
+    and other time-dependent variations.
 
     Parameters:
     -----------
@@ -114,15 +120,27 @@ def add_time_features(df):
 
     Returns:
     --------
-    df: pandas DataFrame
-        The DataFrame with additional time-based features:
-        - 'year': Extracts the year from the date.
-        - 'month': Extracts the month (1-12) from the date.
-        - 'quarter': Extracts the quarter (1-4) from the date.
-    '''
+    pandas DataFrame
+        The original DataFrame with additional time-based features:
+        - 'year': The year extracted from the date.
+        - 'month': The month (1-12) extracted from the date.
+        - 'quarter': The quarter (1-4) extracted from the date.
+
+    Raises:
+    -------
+    KeyError:
+        If the 'observation_date' column is missing from the DataFrame.
+    """
+    if "observation_date" not in df:
+        logging.error("Missing 'observation_date' column in DataFrame.")
+        raise KeyError("Missing 'observation_date' column in DataFrame.")
+    
     df["year"] = df["observation_date"].dt.year
     df["month"] = df["observation_date"].dt.month
     df["quarter"] = df["observation_date"].dt.quarter
+    
+    logging.info(f"Added time features: year, month, quarter. DataFrame shape: {df.shape}")
+    
     return df
 
 def add_modified_feature(df, target_col, func):
@@ -148,23 +166,9 @@ def add_modified_feature(df, target_col, func):
     return df
 
 def create_sequences(data, target, seq_len, exog=None, fft_real=None, fft_imag=None, config={'use_fft': False, 'use_exog': False}):
-    """
-    Creates sequences dynamically based on the provided configuration.
+    if data.ndim == 1:  
+        data = data.reshape(-1, 1)  # Convert to 2D
 
-    Parameters:
-    -----------
-    data: numpy array, time-series target data.
-    exog: numpy array, exogenous variables (if any).
-    fft_real: numpy array, real part of FFT transformation.
-    fft_imag: numpy array, imaginary part of FFT transformation.
-    target: numpy array, target variable.
-    seq_len: int, sequence length.
-    config: dict, configuration specifying which features to include.
-
-    Returns:
-    --------
-    Processed sequences for model input.
-    """
     X, X_exog, y = [], [], []
     for i in range(len(data) - seq_len):
         seq_data = data[i : i + seq_len].flatten()
@@ -178,43 +182,57 @@ def create_sequences(data, target, seq_len, exog=None, fft_real=None, fft_imag=N
             X_exog.append(exog[i])
 
         X.append(seq_data)
-        y.append(target[i + seq_len])  
+        y.append(target[i + seq_len])
 
     if config.get("use_exog", False):
-        return np.array(X), np.array(X_exog), np.array(y)  # Return exog separately
+        return np.array(X), np.array(X_exog), np.array(y)
     else:
         return np.array(X), np.array(y)
-        
 
-def train_val_test_split(X : np.array, y : np.array, train_size : float, val_size : float, test_size=None):
+        
+def train_val_test_split(X, y, train_size=0.7, val_size=0.15, test_size=None):
     """
-    Splits dataset into training, validation, and test sets.
+    Splits a dataset into training, validation, and test sets while ensuring 
+    the specified proportions sum to 1.
 
     Parameters:
     -----------
-    X: numpy array, time-series input data.
-    y: numpy array, time-series target data.
-    train_size: float giving the proportion of data represented by the training set.
-    val_size: float giving the proportion of data represented by the validation set.
-    train_size (optional): float giving the proportion of data represented by the test set. (inferred if not included)
+    X: numpy array
+        The time-series input data.
+    y: numpy array
+        The corresponding target variable data.
+    train_size: float, default=0.7
+        The proportion of the dataset assigned to training.
+    val_size: float, default=0.15
+        The proportion of the dataset assigned to validation.
+    test_size: float, optional
+        The proportion of the dataset assigned to testing. If not provided, 
+        it is inferred as `1 - (train_size + val_size)`.
 
     Returns:
     --------
-    Training, validation, and test input and target datasets.
+    tuple:
+        - X_train (numpy array): Training input data.
+        - y_train (numpy array): Training target data.
+        - X_valid (numpy array): Validation input data.
+        - y_valid (numpy array): Validation target data.
+        - X_test (numpy array): Test input data.
+        - y_test (numpy array): Test target data.
+
+    Raises:
+    -------
+    ValueError:
+        If the sum of `train_size`, `val_size`, and `test_size` does not equal 1.
     """
-    if not test_size:
-        test_size = 1 - (train_size + val_size)
-    if train_size + val_size + test_size != 1:
-        raise ValueError('Train, validation, and test sizes must sum to 1.')
-
+    if test_size is None:
+        test_size = 1 - train_size - val_size
+    if not np.isclose(train_size + val_size + test_size, 1, atol=1e-6):
+        raise ValueError(f"Train, validation, and test sizes must sum to 1, got {train_size + val_size + test_size}")
+    
     train_idx = int(len(X) * train_size)
-    valid_idx = int(len(X) * (train_size + val_size))
+    val_idx = int(len(X) * (train_size + val_size))
 
-    X_train, y_train = X[:train_idx], y[:train_idx]
-    X_valid, y_valid = X[train_idx:valid_idx], y[train_idx:valid_idx]
-    X_test, y_test = X[valid_idx:], y[valid_idx:]
-
-    return X_train, y_train, X_valid, y_valid, X_test, y_test
+    return X[:train_idx], y[:train_idx], X[train_idx:val_idx], y[train_idx:val_idx], X[val_idx:], y[val_idx:]
 
 def load_data(train_file : str, sequence_length=48, train_size : float = 0.7, val_size : float = 0.15, test_size : float = 0.15, config={}):
     '''

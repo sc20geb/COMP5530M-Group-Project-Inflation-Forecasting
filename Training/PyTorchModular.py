@@ -290,7 +290,7 @@ def optuna_tune_and_train(
     """
 
     # Step 1: Run Optuna Hyperparameter Tuning
-    study = optuna.create_study(direction="minimize", study_name=f'{model_name if model_name != 'Model' else model_class.__name__}_hyperparameter_optimisation')
+    study = optuna.create_study(direction="minimize", study_name=f"{model_name if model_name != 'Model' else model_class.__name__}_hyperparameter_optimisation")
 
     def objective(trial):
         """Objective function for Optuna hyperparameter tuning."""
