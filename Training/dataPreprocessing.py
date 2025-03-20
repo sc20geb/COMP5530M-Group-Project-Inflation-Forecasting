@@ -107,7 +107,7 @@ def add_rolling_features(df, target_col, windows=[3, 6, 12]):
         df[f"{target_col}_rolling_std{window}"] = df[target_col].rolling(window=window).std()
     return df
 
-def add_time_features(df):
+def add_time_features(df, date_col: str = 'observation_date'):
     """
     Extracts and adds time-based features from the 'observation_date' column to 
     enhance the model's ability to capture seasonal patterns, economic cycles, 
@@ -117,6 +117,8 @@ def add_time_features(df):
     -----------
     df: pandas DataFrame
         The input DataFrame containing a datetime column named 'observation_date'.
+    date_col: str
+        The name of the column in df containing the datetime objects from which time features are to be extracted.
 
     Returns:
     --------
@@ -131,13 +133,13 @@ def add_time_features(df):
     KeyError:
         If the 'observation_date' column is missing from the DataFrame.
     """
-    if "observation_date" not in df:
-        logging.error("Missing 'observation_date' column in DataFrame.")
-        raise KeyError("Missing 'observation_date' column in DataFrame.")
+    if date_col not in df:
+        logging.error(f"Missing '{date_col}' column in DataFrame.")
+        raise KeyError(f"Missing '{date_col}' column in DataFrame.")
     
-    df["year"] = df["observation_date"].dt.year
-    df["month"] = df["observation_date"].dt.month
-    df["quarter"] = df["observation_date"].dt.quarter
+    df["year"] = df[date_col].dt.year
+    df["month"] = df[date_col].dt.month
+    df["quarter"] = df[date_col].dt.quarter
     
     logging.info(f"Added time features: year, month, quarter. DataFrame shape: {df.shape}")
     
@@ -166,6 +168,30 @@ def add_modified_feature(df, target_col, func):
     return df
 
 def create_sequences(data, target, seq_len, exog=None, fft_real=None, fft_imag=None, config={'use_fft': False, 'use_exog': False}):
+    """
+    Creates sequences of a specified length from the input and target data dynamically based on the provided configuration.
+
+    Parameters:
+    -----------
+    data: numpy array
+        Time-series target data.
+    target: numpy array
+        Target variable.
+    seq_len: int
+        Sequence length.
+    exog: numpy array (optional)
+        Exogenous variables (if any).
+    fft_real: numpy array (optional)
+        Real part of FFT transformation.
+    fft_imag: numpy array (optional)
+        Imaginary part of FFT transformation.
+    config: dict (optional)
+        Configuration specifying which features to include.
+
+    Returns:
+    --------
+    Processed sequences for model input.
+    """
     if data.ndim == 1:  
         data = data.reshape(-1, 1)  # Convert to 2D
 

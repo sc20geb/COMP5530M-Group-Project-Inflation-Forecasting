@@ -17,6 +17,8 @@ def train_epoch(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     batchStatusUpdate: int = None,
+    gradientClipper: torch.nn.utils = None,
+    gradientClipperKwargs: dict = {},
 ):
     """
     This function trains a model for one epoch
@@ -34,6 +36,10 @@ def train_epoch(
     device: The device to run the model on .i.e "cuda" or "cpu"
 
     batchStatusUpdate: Informs the user what batch they are on every multiple of batchStatusUpdate. Use None to disable.
+
+    gradientClipper: (optional) a PyTorch gradient clipper
+
+    gradientClipperKwargs: (optional) Dictionary specifying any keyword arguments to gradientClipper
 
     Returns:
     --------
@@ -72,6 +78,9 @@ def train_epoch(
 
         # Backwards pass:
         loss.backward()
+
+        # Apply torch.nn utilities gradient clipper function if passed:
+        if gradientClipper: gradientClipper(model.parameters(), **gradientClipperKwargs)
 
         # Improve model:
         optimizer.step()
@@ -153,6 +162,8 @@ def train_model(
     batchStatusUpdate=None,
     verbose=True,
     seed=42,
+    gradientClipper=torch.nn.utils.clip_grad_norm_,
+    gradientClipperKwargs={'max_norm': 1.0},
 ):
     """
     This function trains a model for given number of epochs and saves the best performing model.
@@ -172,6 +183,8 @@ def train_model(
     batchStatusUpdate: (Optional) Prints batch status update frequency.
     verbose: (Optional) Whether to print loss updates.
     seed: (Optional) Random seed for reproducibility.
+    gradientClipper: (Optional) a PyTorch gradient clipper.
+    gradientClipperKwargs: (Optional) Dictionary specifying any keyword arguments to gradientClipper.
 
     Returns:
     --------
@@ -196,31 +209,12 @@ def train_model(
     torch.manual_seed(seed)
 
     for epoch in tqdm(range(0, maxEpochs), desc="Training Progress"):
-
         t0 = time.time()
         model.train()
-        train_loss = 0
 
-        #TODO: Have this use train_epoch
-        for batch, batch_data in enumerate(dataLoaderTrain):
-            # Unpacks batch data into inputs and targets; can handle arbitrary numbers of inputs
-            *inputs, targets = batch_data
-            inputs = [input.to(device) for input in inputs]
-            targets = targets.to(device)
-            y_pred = model(*inputs)
+        train_loss = train_epoch(model, dataLoaderTrain, lossFn, optimizer, device, batchStatusUpdate=batchStatusUpdate, 
+                                 gradientClipper=gradientClipper, gradientClipperKwargs=gradientClipperKwargs)
 
-            optimizer.zero_grad()
-            loss = lossFn(y_pred, targets)
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer.step()
-            train_loss += loss.item()
-
-            #inform user of the current batch number when requested
-            if batchStatusUpdate and batch % batchStatusUpdate == 0:
-                print(f"\tBatch: {batch}")
-
-        train_loss /= len(dataLoaderTrain)
         metaData["trainLoss"].append(train_loss)
 
         valid_loss = validate_logits(model, dataLoaderValid, lossFn, device)
