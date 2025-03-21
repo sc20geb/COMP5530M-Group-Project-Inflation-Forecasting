@@ -1,0 +1,385 @@
+Variable,Group1,Group2,Mean Diff,p-value,Significant
+fred_AAAFFM,High,Low,-2.763,-6.7678,Yes
+fred_AAAFFM,High,Medium,3.724,-0.2969,Yes
+fred_AAAFFM,Low,Medium,6.4871,2.4742,No
+fred_AHETPI,High,Low,-31.5394,-32.9094,Yes
+fred_AHETPI,High,Medium,-16.077,-17.4443,Yes
+fred_AHETPI,Low,Medium,15.4624,14.0978,No
+fred_APU000074714,High,Low,-26.764,-29.0663,Yes
+fred_APU000074714,High,Medium,-7.5199,-9.8223,Yes
+fred_APU000074714,Low,Medium,19.244,16.9417,No
+fred_BAA10YM,High,Low,-14.772,-18.4245,Yes
+fred_BAA10YM,High,Medium,-5.7469,-9.4143,Yes
+fred_BAA10YM,Low,Medium,9.025,5.365,No
+fred_BAAFFM,High,Low,-4.7585,-8.7688,Yes
+fred_BAAFFM,High,Medium,1.5899,-2.4205,Yes
+fred_BAAFFM,Low,Medium,6.3484,2.338,No
+fred_CSUSHPISA,High,Low,-28.4598,-30.5173,Yes
+fred_CSUSHPISA,High,Medium,-10.0475,-12.1049,Yes
+fred_CSUSHPISA,Low,Medium,18.4123,16.3549,No
+fred_EXCAUS,High,Low,11.3966,7.7064,No
+fred_EXCAUS,High,Medium,13.3497,9.6595,No
+fred_EXCAUS,Low,Medium,1.9531,-1.7371,Yes
+fred_EXDNUS,High,Low,3.6621,-0.3759,Yes
+fred_EXDNUS,High,Medium,-1.5741,-5.6121,Yes
+fred_EXDNUS,Low,Medium,-5.2362,-9.2741,Yes
+fred_EXINUS,High,Low,-28.6949,-30.7801,Yes
+fred_EXINUS,High,Medium,-15.638,-17.7232,Yes
+fred_EXINUS,Low,Medium,13.0569,10.9717,No
+fred_EXKOUS,High,Low,-13.9023,-16.8684,Yes
+fred_EXKOUS,High,Medium,8.9191,5.953,No
+fred_EXKOUS,Low,Medium,22.8214,19.8552,No
+fred_EXMAUS,High,Low,-25.0897,-28.6288,Yes
+fred_EXMAUS,High,Medium,-14.2235,-17.5696,Yes
+fred_EXMAUS,Low,Medium,10.8663,8.0043,No
+fred_EXNOUS,High,Low,-4.7342,-8.2966,Yes
+fred_EXNOUS,High,Medium,-15.9855,-19.548,Yes
+fred_EXNOUS,Low,Medium,-11.2514,-14.8138,Yes
+fred_EXSDUS,High,Low,-8.6713,-12.5279,Yes
+fred_EXSDUS,High,Medium,-10.3997,-14.2564,Yes
+fred_EXSDUS,Low,Medium,-1.7285,-5.5852,Yes
+fred_EXSIUS,High,Low,24.3366,21.6793,No
+fred_EXSIUS,High,Medium,5.8885,3.2313,No
+fred_EXSIUS,Low,Medium,-18.448,-21.1053,Yes
+fred_EXSZUS,High,Low,28.3786,26.3284,No
+fred_EXSZUS,High,Medium,9.453,7.4028,No
+fred_EXSZUS,Low,Medium,-18.9256,-20.9758,Yes
+fred_EXTAUS,High,Low,-8.0935,-11.3957,Yes
+fred_EXTAUS,High,Medium,11.5227,8.2204,No
+fred_EXTAUS,Low,Medium,19.6162,16.3139,No
+fred_EXUSAL,High,Low,-7.6859,-11.6497,Yes
+fred_EXUSAL,High,Medium,-6.4912,-10.4549,Yes
+fred_EXUSAL,Low,Medium,1.1947,-2.769,Yes
+fred_EXUSNZ,High,Low,-21.7442,-24.8181,Yes
+fred_EXUSNZ,High,Medium,-7.7577,-10.8316,Yes
+fred_EXUSNZ,Low,Medium,13.9865,10.9127,No
+fred_EXUSUK,High,Low,11.8515,8.0362,No
+fred_EXUSUK,High,Medium,4.0062,0.1909,No
+fred_EXUSUK,Low,Medium,-7.8453,-11.6606,Yes
+fred_FEDFUNDS,High,Low,22.8008,19.8012,No
+fred_FEDFUNDS,High,Medium,10.8827,7.889,No
+fred_FEDFUNDS,Low,Medium,-11.9181,-14.9057,Yes
+fred_IPMINE,High,Low,-16.0574,-18.6144,Yes
+fred_IPMINE,High,Medium,-25.8158,-28.3728,Yes
+fred_IPMINE,Low,Medium,-9.7584,-12.3154,Yes
+fred_M2SL,High,Low,-31.4758,-32.8425,Yes
+fred_M2SL,High,Medium,-16.0809,-17.4477,Yes
+fred_M2SL,Low,Medium,15.3949,14.0281,No
+fred_MPRIME,High,Low,22.7447,19.7491,No
+fred_MPRIME,High,Medium,11.1382,8.1426,No
+fred_MPRIME,Low,Medium,-11.6065,-14.6021,Yes
+fred_PCUOMFGOMFG,High,Low,-31.3328,-32.7483,Yes
+fred_PCUOMFGOMFG,High,Medium,-15.9438,-17.3593,Yes
+fred_PCUOMFGOMFG,Low,Medium,15.389,13.9735,No
+fred_PCUOMINOMIN,High,Low,-24.7262,-27.1678,Yes
+fred_PCUOMINOMIN,High,Medium,-3.6196,-6.0711,Yes
+fred_PCUOMINOMIN,Low,Medium,21.1066,18.66,No
+fred_PPIACO,High,Low,-30.9111,-32.4592,Yes
+fred_PPIACO,High,Medium,-15.1004,-16.6484,Yes
+fred_PPIACO,Low,Medium,15.8107,14.2627,No
+fred_T3MFFM,High,Low,-9.1022,-12.9376,Yes
+fred_T3MFFM,High,Medium,1.6529,-2.1977,Yes
+fred_T3MFFM,Low,Medium,10.7551,6.9354,No
+fred_TB3MS,High,Low,22.9516,19.9685,No
+fred_TB3MS,High,Medium,11.2303,8.2531,No
+fred_TB3MS,Low,Medium,-11.7213,-14.6925,Yes
+fred_TB6MS,High,Low,22.9544,19.9828,No
+fred_TB6MS,High,Medium,11.6508,8.6793,No
+fred_TB6MS,Low,Medium,-11.3035,-14.2751,Yes
+fred_TB6SMFFM,High,Low,-11.1219,-14.8115,Yes
+fred_TB6SMFFM,High,Medium,2.9707,-0.6979,Yes
+fred_TB6SMFFM,Low,Medium,14.0925,10.4699,No
+fred_TERMCBPER24NS,High,Low,30.5886,28.9594,No
+fred_TERMCBPER24NS,High,Medium,13.9463,12.3138,No
+fred_TERMCBPER24NS,Low,Medium,-16.6423,-18.2683,Yes
+fred_PSOYBUSDM,High,Low,-22.7347,-25.721,Yes
+fred_PSOYBUSDM,High,Medium,-13.1473,-16.1336,Yes
+fred_PSOYBUSDM,Low,Medium,9.5874,6.601,No
+fred_A053RC1Q027SBEA,High,Low,-30.4228,-32.108,Yes
+fred_A053RC1Q027SBEA,High,Medium,-15.8751,-17.5602,Yes
+fred_A053RC1Q027SBEA,Low,Medium,14.5478,12.8626,No
+fred_FYGFGDQ188S,High,Low,-20.1408,-22.2927,Yes
+fred_FYGFGDQ188S,High,Medium,-27.4158,-29.5677,Yes
+fred_FYGFGDQ188S,Low,Medium,-7.275,-9.4268,Yes
+fred_GDP,High,Low,-31.4763,-32.8429,Yes
+fred_GDP,High,Medium,-16.0804,-17.447,Yes
+fred_GDP,Low,Medium,15.3959,14.0293,No
+fred_GFDEGDQ188S,High,Low,-25.0896,-27.3964,Yes
+fred_GFDEGDQ188S,High,Medium,-22.4671,-24.7739,Yes
+fred_GFDEGDQ188S,Low,Medium,2.6225,0.3157,No
+fred_FDHBFIN,High,Low,-30.5838,-32.2101,Yes
+fred_FDHBFIN,High,Medium,-16.9728,-18.599,Yes
+fred_FDHBFIN,Low,Medium,13.611,11.9848,No
+fred_FDHBPIN,High,Low,-29.5907,-31.4369,Yes
+fred_FDHBPIN,High,Medium,-17.8729,-19.7191,Yes
+fred_FDHBPIN,Low,Medium,11.7178,9.8716,No
+fred_FYGFDPUN,High,Low,-30.0865,-31.8289,Yes
+fred_FYGFDPUN,High,Medium,-17.4702,-19.2126,Yes
+fred_FYGFDPUN,Low,Medium,12.6164,10.8739,No
+fred_DCOILWTICO,High,Low,-24.5714,-27.1399,Yes
+fred_DCOILWTICO,High,Medium,-4.9375,-7.506,Yes
+fred_DCOILWTICO,Low,Medium,19.6339,17.0654,No
+fred_DGS10,High,Low,31.0264,29.5128,No
+fred_DGS10,High,Medium,15.2932,13.7796,No
+fred_DGS10,Low,Medium,-15.7332,-17.2468,Yes
+CrudeOilWTI_Price,High,Low,-24.465,-27.0841,Yes
+CrudeOilWTI_Price,High,Medium,-5.5402,-8.1593,Yes
+CrudeOilWTI_Price,Low,Medium,18.9248,16.3057,No
+CrudeOilWTI_Open,High,Low,-24.4753,-27.0921,Yes
+CrudeOilWTI_Open,High,Medium,-5.5278,-8.1446,Yes
+CrudeOilWTI_Open,Low,Medium,18.9475,16.3307,No
+CrudeOilWTI_High,High,Low,-24.7855,-27.3251,Yes
+CrudeOilWTI_High,High,Medium,-5.0824,-7.6221,Yes
+CrudeOilWTI_High,Low,Medium,19.703,17.1634,No
+CrudeOilWTI_Low,High,Low,-24.316,-26.9656,Yes
+CrudeOilWTI_Low,High,Medium,-5.6618,-8.3114,Yes
+CrudeOilWTI_Low,Low,Medium,18.6542,16.0045,No
+CrudeOilWTI_Vol.,High,Low,-30.0108,-31.8134,Yes
+CrudeOilWTI_Vol.,High,Medium,-13.6447,-15.4437,Yes
+CrudeOilWTI_Vol.,Low,Medium,16.3661,14.5707,No
+BrentOil_Price,High,Low,-25.6331,-28.0964,Yes
+BrentOil_Price,High,Medium,-6.4549,-8.9182,Yes
+BrentOil_Price,Low,Medium,19.1782,16.7149,No
+BrentOil_Open,High,Low,-25.6428,-28.1062,Yes
+BrentOil_Open,High,Medium,-6.4905,-8.9539,Yes
+BrentOil_Open,Low,Medium,19.1523,16.6889,No
+BrentOil_High,High,Low,-25.7525,-28.222,Yes
+BrentOil_High,High,Medium,-7.0165,-9.4861,Yes
+BrentOil_High,Low,Medium,18.736,16.2664,No
+BrentOil_Low,High,Low,-25.413,-27.9163,Yes
+BrentOil_Low,High,Medium,-6.4639,-8.9672,Yes
+BrentOil_Low,Low,Medium,18.9491,16.4457,No
+BrentOil_Vol.,High,Low,-31.0509,-32.5796,Yes
+BrentOil_Vol.,High,Medium,-15.656,-17.1817,Yes
+BrentOil_Vol.,Low,Medium,15.3949,13.8723,No
+Gold_Price,High,Low,-28.0058,-30.142,Yes
+Gold_Price,High,Medium,-18.4992,-20.6354,Yes
+Gold_Price,Low,Medium,9.5066,7.3705,No
+Gold_Low,High,Low,-28.1388,-30.2492,Yes
+Gold_Low,High,Medium,-18.5499,-20.6604,Yes
+Gold_Low,Low,Medium,9.5889,7.4784,No
+Gold_Change %,High,Low,-3.0099,-7.0343,Yes
+Gold_Change %,High,Medium,-5.2454,-9.3024,Yes
+Gold_Change %,Low,Medium,-2.2354,-6.2764,Yes
+Silver_Price,High,Low,-27.6448,-29.9291,Yes
+Silver_Price,High,Medium,-15.4284,-17.7126,Yes
+Silver_Price,Low,Medium,12.2164,9.9322,No
+Silver_Open,High,Low,-27.6572,-29.9407,Yes
+Silver_Open,High,Medium,-15.3232,-17.6067,Yes
+Silver_Open,Low,Medium,12.334,10.0505,No
+Silver_High,High,Low,-27.3024,-29.6515,Yes
+Silver_High,High,Medium,-14.9429,-17.292,Yes
+Silver_High,Low,Medium,12.3596,10.0105,No
+Silver_Low,High,Low,-27.652,-29.9367,Yes
+Silver_Low,High,Medium,-15.2999,-17.5846,Yes
+Silver_Low,Low,Medium,12.3521,10.0674,No
+Silver_Change %,High,Low,0.3342,-3.6685,Yes
+Silver_Change %,High,Medium,-5.8116,-9.8143,Yes
+Silver_Change %,Low,Medium,-6.1458,-10.1485,Yes
+Copper_Price,High,Low,-23.5474,-26.4481,Yes
+Copper_Price,High,Medium,-11.3802,-14.2809,Yes
+Copper_Price,Low,Medium,12.1672,9.2665,No
+Copper_Open,High,Low,-23.7801,-26.6526,Yes
+Copper_Open,High,Medium,-11.7045,-14.5769,Yes
+Copper_Open,Low,Medium,12.0757,9.2032,No
+Copper_High,High,Low,-23.3824,-26.3015,Yes
+Copper_High,High,Medium,-10.9151,-13.8343,Yes
+Copper_High,Low,Medium,12.4673,9.5482,No
+Copper_Low,High,Low,-23.8389,-26.704,Yes
+Copper_Low,High,Medium,-12.1706,-15.0357,Yes
+Copper_Low,Low,Medium,11.6683,8.8032,No
+BalticDryIndex_Price,High,Low,3.6224,-0.2262,Yes
+BalticDryIndex_Price,High,Medium,-7.4869,-11.3355,Yes
+BalticDryIndex_Price,Low,Medium,-11.1093,-14.9578,Yes
+BalticDryIndex_Open,High,Low,3.4215,-0.42,Yes
+BalticDryIndex_Open,High,Medium,-7.6399,-11.497,Yes
+BalticDryIndex_Open,Low,Medium,-11.0614,-14.9108,Yes
+BalticDryIndex_High,High,Low,1.1903,-2.6834,Yes
+BalticDryIndex_High,High,Medium,-8.6533,-12.527,Yes
+BalticDryIndex_High,Low,Medium,-9.8436,-13.7173,Yes
+BalticDryIndex_Low,High,Low,6.4852,2.6501,No
+BalticDryIndex_Low,High,Medium,-5.1202,-8.9553,Yes
+BalticDryIndex_Low,Low,Medium,-11.6054,-15.4404,Yes
+NASDAQComposite_Price,High,Low,-27.8187,-30.0823,Yes
+NASDAQComposite_Price,High,Medium,-13.6894,-15.9529,Yes
+NASDAQComposite_Price,Low,Medium,14.1294,11.8658,No
+NASDAQComposite_High,High,Low,-27.2637,-29.6216,Yes
+NASDAQComposite_High,High,Medium,-12.545,-14.9029,Yes
+NASDAQComposite_High,Low,Medium,14.7187,12.3608,No
+NASDAQComposite_Low,High,Low,-27.9877,-30.2199,Yes
+NASDAQComposite_Low,High,Medium,-13.9644,-16.1967,Yes
+NASDAQComposite_Low,Low,Medium,14.0233,11.791,No
+SP500_Price,High,Low,-27.3686,-29.7128,Yes
+SP500_Price,High,Medium,-14.0203,-16.3644,Yes
+SP500_Price,Low,Medium,13.3484,11.0042,No
+SP500_High,High,Low,-26.9919,-29.401,Yes
+SP500_High,High,Medium,-13.2964,-15.7056,Yes
+SP500_High,Low,Medium,13.6954,11.2863,No
+SP500_Low,High,Low,-27.5323,-29.8479,Yes
+SP500_Low,High,Medium,-13.9555,-16.2711,Yes
+SP500_Low,Low,Medium,13.5768,11.2613,No
+CBOEVIX_Low,High,Low,4.2053,0.1486,No
+CBOEVIX_Low,High,Medium,1.2186,-2.8381,Yes
+CBOEVIX_Low,Low,Medium,-2.9867,-7.0434,Yes
+food_price_indices_data_f_Food Price Index,High,Low,-25.5586,-28.1693,Yes
+food_price_indices_data_f_Food Price Index,High,Medium,-14.4553,-17.0765,Yes
+food_price_indices_data_f_Food Price Index,Low,Medium,11.1033,8.4873,No
+food_price_indices_data_f_Meat,High,Low,-22.0243,-24.5397,Yes
+food_price_indices_data_f_Meat,High,Medium,-23.6511,-26.1615,Yes
+food_price_indices_data_f_Meat,Low,Medium,-1.6268,-4.1321,Yes
+food_price_indices_data_f_Dairy,High,Low,-27.3537,-29.6998,Yes
+food_price_indices_data_f_Dairy,High,Medium,-13.1735,-15.5196,Yes
+food_price_indices_data_f_Dairy,Low,Medium,14.1802,11.834,No
+food_price_indices_data_f_Cereals,High,Low,-24.1082,-26.8973,Yes
+food_price_indices_data_f_Cereals,High,Medium,-14.4521,-17.2638,Yes
+food_price_indices_data_f_Cereals,Low,Medium,9.6561,6.8555,No
+food_price_indices_data_f_Oils,High,Low,-24.3891,-27.1802,Yes
+food_price_indices_data_f_Oils,High,Medium,-13.2277,-16.0188,Yes
+food_price_indices_data_f_Oils,Low,Medium,11.1613,8.3702,No
+food_price_indices_data_f_Sugar,High,Low,-18.4295,-21.8413,Yes
+food_price_indices_data_f_Sugar,High,Medium,-9.3997,-12.8115,Yes
+food_price_indices_data_f_Sugar,Low,Medium,9.0299,5.6181,No
+BCI_BCI,High,Low,-6.8475,-10.8109,Yes
+BCI_BCI,High,Medium,0.6151,-3.3483,Yes
+BCI_BCI,Low,Medium,7.4626,3.4992,No
+"CMO-Historical-Data-Monthly_Coal, Australian",High,Low,-23.91,-26.7462,Yes
+"CMO-Historical-Data-Monthly_Coal, Australian",High,Medium,-14.3548,-17.1909,Yes
+"CMO-Historical-Data-Monthly_Coal, Australian",Low,Medium,9.5552,6.7191,No
+"CMO-Historical-Data-Monthly_Coal, South African **",High,Low,-26.4984,-28.9883,Yes
+"CMO-Historical-Data-Monthly_Coal, South African **",High,Medium,-13.4561,-15.9461,Yes
+"CMO-Historical-Data-Monthly_Coal, South African **",Low,Medium,13.0422,10.5522,No
+CMO-Historical-Data-Monthly_Cocoa,High,Low,-27.138,-29.5104,Yes
+CMO-Historical-Data-Monthly_Cocoa,High,Medium,-11.8743,-14.2468,Yes
+CMO-Historical-Data-Monthly_Cocoa,Low,Medium,15.2637,12.8912,No
+"CMO-Historical-Data-Monthly_Tea, Colombo",High,Low,-26.4547,-28.9203,Yes
+"CMO-Historical-Data-Monthly_Tea, Colombo",High,Medium,-16.0234,-18.489,Yes
+"CMO-Historical-Data-Monthly_Tea, Colombo",Low,Medium,10.4313,7.9657,No
+CMO-Historical-Data-Monthly_Coconut oil,High,Low,-24.5658,-27.3085,Yes
+CMO-Historical-Data-Monthly_Coconut oil,High,Medium,-15.1026,-17.8454,Yes
+CMO-Historical-Data-Monthly_Coconut oil,Low,Medium,9.4631,6.7204,No
+CMO-Historical-Data-Monthly_Groundnut oil **,High,Low,-26.1174,-28.6957,Yes
+CMO-Historical-Data-Monthly_Groundnut oil **,High,Medium,-13.4401,-16.0184,Yes
+CMO-Historical-Data-Monthly_Groundnut oil **,Low,Medium,12.6773,10.1306,No
+CMO-Historical-Data-Monthly_Palm oil,High,Low,-22.8428,-25.8274,Yes
+CMO-Historical-Data-Monthly_Palm oil,High,Medium,-11.367,-14.3515,Yes
+CMO-Historical-Data-Monthly_Palm oil,Low,Medium,11.4759,8.4913,No
+CMO-Historical-Data-Monthly_Soybean oil,High,Low,-24.7888,-27.5299,Yes
+CMO-Historical-Data-Monthly_Soybean oil,High,Medium,-12.7576,-15.4988,Yes
+CMO-Historical-Data-Monthly_Soybean oil,Low,Medium,12.0311,9.2899,No
+CMO-Historical-Data-Monthly_Soybean meal,High,Low,-26.209,-28.7407,Yes
+CMO-Historical-Data-Monthly_Soybean meal,High,Medium,-12.0946,-14.6263,Yes
+CMO-Historical-Data-Monthly_Soybean meal,Low,Medium,14.1144,11.5827,No
+CMO-Historical-Data-Monthly_Maize,High,Low,-20.9531,-24.1325,Yes
+CMO-Historical-Data-Monthly_Maize,High,Medium,-11.9026,-15.0821,Yes
+CMO-Historical-Data-Monthly_Maize,Low,Medium,9.0504,5.871,No
+"CMO-Historical-Data-Monthly_Rice, Thai 5% ",High,Low,-24.6515,-27.3657,Yes
+"CMO-Historical-Data-Monthly_Rice, Thai 5% ",High,Medium,-15.8707,-18.585,Yes
+"CMO-Historical-Data-Monthly_Rice, Thai 5% ",Low,Medium,8.7808,6.0665,No
+"CMO-Historical-Data-Monthly_Rice, Thai A.1",High,Low,-27.9551,-30.1525,Yes
+"CMO-Historical-Data-Monthly_Rice, Thai A.1",High,Medium,-16.9932,-19.1905,Yes
+"CMO-Historical-Data-Monthly_Rice, Thai A.1",Low,Medium,10.962,8.7646,No
+"CMO-Historical-Data-Monthly_Wheat, US HRW",High,Low,-22.1042,-25.1602,Yes
+"CMO-Historical-Data-Monthly_Wheat, US HRW",High,Medium,-9.227,-12.283,Yes
+"CMO-Historical-Data-Monthly_Wheat, US HRW",Low,Medium,12.8772,9.8212,No
+CMO-Historical-Data-Monthly_Beef **,High,Low,-26.4662,-28.7161,Yes
+CMO-Historical-Data-Monthly_Beef **,High,Medium,-20.8612,-23.1111,Yes
+CMO-Historical-Data-Monthly_Beef **,Low,Medium,5.605,3.355,No
+CMO-Historical-Data-Monthly_Lamb **,High,Low,-30.5495,-32.1908,Yes
+CMO-Historical-Data-Monthly_Lamb **,High,Medium,-16.667,-18.3082,Yes
+CMO-Historical-Data-Monthly_Lamb **,Low,Medium,13.8825,12.2412,No
+"CMO-Historical-Data-Monthly_Sugar, EU",High,Low,23.4671,21.1029,No
+"CMO-Historical-Data-Monthly_Sugar, EU",High,Medium,-0.2726,-2.6368,Yes
+"CMO-Historical-Data-Monthly_Sugar, EU",Low,Medium,-23.7397,-26.1039,Yes
+"CMO-Historical-Data-Monthly_Sugar, world",High,Low,-18.4295,-21.8413,Yes
+"CMO-Historical-Data-Monthly_Sugar, world",High,Medium,-9.3997,-12.8115,Yes
+"CMO-Historical-Data-Monthly_Sugar, world",Low,Medium,9.0299,5.6181,No
+"CMO-Historical-Data-Monthly_Logs, Cameroon",High,Low,-23.6833,-26.5182,Yes
+"CMO-Historical-Data-Monthly_Logs, Cameroon",High,Medium,-15.6118,-18.4467,Yes
+"CMO-Historical-Data-Monthly_Logs, Cameroon",Low,Medium,8.0715,5.2367,No
+"CMO-Historical-Data-Monthly_Cotton, A Index",High,Low,-9.2899,-13.1567,Yes
+"CMO-Historical-Data-Monthly_Cotton, A Index",High,Medium,0.31,-3.5568,Yes
+"CMO-Historical-Data-Monthly_Cotton, A Index",Low,Medium,9.5999,5.7331,No
+"CMO-Historical-Data-Monthly_Rubber, RSS3",High,Low,-23.2956,-26.1241,Yes
+"CMO-Historical-Data-Monthly_Rubber, RSS3",High,Medium,-6.2007,-9.0292,Yes
+"CMO-Historical-Data-Monthly_Rubber, RSS3",Low,Medium,17.0949,14.2664,No
+CMO-Historical-Data-Monthly_Phosphate rock,High,Low,-23.0101,-24.7217,Yes
+CMO-Historical-Data-Monthly_Phosphate rock,High,Medium,4.9421,2.1441,No
+CMO-Historical-Data-Monthly_Phosphate rock,Low,Medium,27.9522,25.2991,No
+CMO-Historical-Data-Monthly_DAP,High,Low,-26.0085,-28.5699,Yes
+CMO-Historical-Data-Monthly_DAP,High,Medium,-11.862,-14.4234,Yes
+CMO-Historical-Data-Monthly_DAP,Low,Medium,14.1465,11.5851,No
+CMO-Historical-Data-Monthly_TSP,High,Low,-26.3398,-28.8248,Yes
+CMO-Historical-Data-Monthly_TSP,High,Medium,-11.161,-13.656,Yes
+CMO-Historical-Data-Monthly_TSP,Low,Medium,15.1788,12.6887,No
+CMO-Historical-Data-Monthly_Urea ,High,Low,-24.7935,-27.5229,Yes
+CMO-Historical-Data-Monthly_Urea ,High,Medium,-10.6151,-13.3445,Yes
+CMO-Historical-Data-Monthly_Urea ,Low,Medium,14.1784,11.4489,No
+CMO-Historical-Data-Monthly_Potassium chloride **,High,Low,-25.458,-27.4089,Yes
+CMO-Historical-Data-Monthly_Potassium chloride **,High,Medium,-6.0308,-8.4059,Yes
+CMO-Historical-Data-Monthly_Potassium chloride **,Low,Medium,19.4271,17.1784,No
+CMO-Historical-Data-Monthly_Aluminum,High,Low,-18.8682,-22.221,Yes
+CMO-Historical-Data-Monthly_Aluminum,High,Medium,-6.6582,-10.011,Yes
+CMO-Historical-Data-Monthly_Aluminum,Low,Medium,12.21,8.8572,No
+"CMO-Historical-Data-Monthly_Iron ore, cfr spot",High,Low,-23.6503,-26.4463,Yes
+"CMO-Historical-Data-Monthly_Iron ore, cfr spot",High,Medium,-13.2081,-16.0961,Yes
+"CMO-Historical-Data-Monthly_Iron ore, cfr spot",Low,Medium,10.4422,7.5969,No
+CMO-Historical-Data-Monthly_Lead,High,Low,-25.5925,-28.2099,Yes
+CMO-Historical-Data-Monthly_Lead,High,Medium,-14.499,-17.1165,Yes
+CMO-Historical-Data-Monthly_Lead,Low,Medium,11.0934,8.476,No
+CMO-Historical-Data-Monthly_Tin,High,Low,-26.6854,-29.0882,Yes
+CMO-Historical-Data-Monthly_Tin,High,Medium,-17.0706,-19.4734,Yes
+CMO-Historical-Data-Monthly_Tin,Low,Medium,9.6148,7.212,No
+CMO-Historical-Data-Monthly_Nickel,High,Low,-21.4653,-24.4684,Yes
+CMO-Historical-Data-Monthly_Nickel,High,Medium,-4.3911,-7.3943,Yes
+CMO-Historical-Data-Monthly_Nickel,Low,Medium,17.0741,14.071,No
+CMO-Historical-Data-Monthly_Zinc,High,Low,-24.0955,-26.9005,Yes
+CMO-Historical-Data-Monthly_Zinc,High,Medium,-14.8493,-17.6544,Yes
+CMO-Historical-Data-Monthly_Zinc,Low,Medium,9.2461,6.4411,No
+CMO-Historical-Data-Monthly_Platinum,High,Low,-24.8633,-27.38,Yes
+CMO-Historical-Data-Monthly_Platinum,High,Medium,-4.925,-7.4417,Yes
+CMO-Historical-Data-Monthly_Platinum,Low,Medium,19.9383,17.4217,No
+CMO-Historical-Data-Monthly_Total_Index,High,Low,-25.5797,-28.0927,Yes
+CMO-Historical-Data-Monthly_Total_Index,High,Medium,-7.2964,-9.8094,Yes
+CMO-Historical-Data-Monthly_Total_Index,Low,Medium,18.2833,15.7703,No
+CMO-Historical-Data-Monthly_Energy,High,Low,-24.8862,-27.4393,Yes
+CMO-Historical-Data-Monthly_Energy,High,Medium,-5.6408,-8.1939,Yes
+CMO-Historical-Data-Monthly_Energy,Low,Medium,19.2454,16.6923,No
+CMO-Historical-Data-Monthly_Non_Energy,High,Low,-25.2844,-27.9525,Yes
+CMO-Historical-Data-Monthly_Non_Energy,High,Medium,-11.5119,-14.18,Yes
+CMO-Historical-Data-Monthly_Non_Energy,Low,Medium,13.7725,11.1044,No
+CMO-Historical-Data-Monthly_Agriculture,High,Low,-25.0931,-27.79,Yes
+CMO-Historical-Data-Monthly_Agriculture,High,Medium,-13.4213,-16.1182,Yes
+CMO-Historical-Data-Monthly_Agriculture,Low,Medium,11.6718,8.9748,No
+CMO-Historical-Data-Monthly_Beverages,High,Low,-23.2671,-26.202,Yes
+CMO-Historical-Data-Monthly_Beverages,High,Medium,-11.4847,-14.4196,Yes
+CMO-Historical-Data-Monthly_Beverages,Low,Medium,11.7824,8.8475,No
+CMO-Historical-Data-Monthly_Food,High,Low,-26.1259,-28.6726,Yes
+CMO-Historical-Data-Monthly_Food,High,Medium,-12.3887,-14.9355,Yes
+CMO-Historical-Data-Monthly_Food,Low,Medium,13.7371,11.1904,No
+CMO-Historical-Data-Monthly_Oils_and_meals,High,Low,-24.9622,-27.6787,Yes
+CMO-Historical-Data-Monthly_Oils_and_meals,High,Medium,-13.097,-15.8136,Yes
+CMO-Historical-Data-Monthly_Oils_and_meals,Low,Medium,11.8652,9.1486,No
+CMO-Historical-Data-Monthly_Grains,High,Low,-22.6001,-25.607,Yes
+CMO-Historical-Data-Monthly_Grains,High,Medium,-12.5563,-15.5632,Yes
+CMO-Historical-Data-Monthly_Grains,Low,Medium,10.0437,7.0368,No
+CMO-Historical-Data-Monthly_Other_foods,High,Low,-26.6499,-29.0542,Yes
+CMO-Historical-Data-Monthly_Other_foods,High,Medium,-17.1952,-19.5994,Yes
+CMO-Historical-Data-Monthly_Other_foods,Low,Medium,9.4548,7.0505,No
+CMO-Historical-Data-Monthly_Raw_materials,High,Low,-22.3841,-25.4203,Yes
+CMO-Historical-Data-Monthly_Raw_materials,High,Medium,-11.248,-14.2843,Yes
+CMO-Historical-Data-Monthly_Raw_materials,Low,Medium,11.136,8.0998,No
+CMO-Historical-Data-Monthly_Other_raw_materials,High,Low,-24.2249,-26.9843,Yes
+CMO-Historical-Data-Monthly_Other_raw_materials,High,Medium,-16.0925,-18.852,Yes
+CMO-Historical-Data-Monthly_Other_raw_materials,Low,Medium,8.1324,5.3729,No
+CMO-Historical-Data-Monthly_Fertilizers,High,Low,-25.401,-28.0403,Yes
+CMO-Historical-Data-Monthly_Fertilizers,High,Medium,-10.5875,-13.2268,Yes
+CMO-Historical-Data-Monthly_Fertilizers,Low,Medium,14.8135,12.1741,No
+CMO-Historical-Data-Monthly_Metals_minerals,High,Low,-23.7915,-26.6613,Yes
+CMO-Historical-Data-Monthly_Metals_minerals,High,Medium,-11.2475,-14.1172,Yes
+CMO-Historical-Data-Monthly_Metals_minerals,Low,Medium,12.5441,9.6744,No
+CMO-Historical-Data-Monthly_Base metals,High,Low,-23.3606,-26.2794,Yes
+CMO-Historical-Data-Monthly_Base metals,High,Medium,-10.4801,-13.399,Yes
+CMO-Historical-Data-Monthly_Base metals,Low,Medium,12.8804,9.9616,No
+CMO-Historical-Data-Monthly_Precious_metals,High,Low,-27.9241,-30.0874,Yes
+CMO-Historical-Data-Monthly_Precious_metals,High,Medium,-18.1824,-20.3457,Yes
+CMO-Historical-Data-Monthly_Precious_metals,Low,Medium,9.7417,7.5784,No
