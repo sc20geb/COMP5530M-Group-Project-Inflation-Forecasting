@@ -7,6 +7,14 @@ from torch.utils.data import DataLoader, TensorDataset
 from statsmodels.tsa.stattools import pacf
 import statsmodels.api as sm
 import logging
+import os
+
+# Useful 'macros' (global variables) defining paths to train and test data 
+MODULE_PATH = os.path.abspath(os.path.join('..'))
+TRAIN_DATA_PATH_1990S = os.path.join(MODULE_PATH, 'Data', 'Train', 'train1990s.csv')
+TRAIN_DATA_PATH_2000S = os.path.join(MODULE_PATH, 'Data', 'Train', 'train2000s.csv')
+TEST_DATA_PATH_1990S = os.path.join(MODULE_PATH, 'Data', 'Test', 'test1990s.csv')
+TEST_DATA_PATH_1990S = os.path.join(MODULE_PATH, 'Data', 'Test', 'test2000s.csv')
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -455,34 +463,34 @@ def drop_near_constant_cols(df, threshold=1e-6):
     return newDf, list(set(orig_cols)-set(newDf.columns))
 
 
-def sklearn_fit_transform(train_df, test_df, sklearn_func, **func_kwargs):
+def sklearn_fit_transform(*args, **func_kwargs):
     """
-    Creates DataFrames containing sklearn-transformed train and test datasets.
-    Transform is fitted on the training set, and applied to both the training and testing sets.
+    Fits and transforms the provided datasets using the provided sklearn function.
+    Transform is fitted on the training (first) set, then applied to the training set followed by all other sets.
 
     Parameters:
     -----------
-    train_df: DataFrame
-        DataFrame containing the training data
-    test_df: DataFrame
-        DataFrame containing the test data
-    sklearn_func: sklearn transform
-        The transform to be applied to the data. Must implement the fit-transform sklearn API
+    *args: n arguments, consisting of the following items at the following indices:
+        [0:n-1]: DataFrame objects, consisting of the following DataFrames at the following indices:
+            0: DataFrame containing the training data.
+            Other: DataFrames containing validation, test, or other data.
+        n-1: sklearn transform
+            The transform to be applied to the data. Must implement the fit-transform sklearn API.
     **func_kwargs: keyword arguments
         Keyword arguments for the sklearn function
 
     Returns:
     --------
-    DataFrames containing the transformed training dataset and the transformed test dataset respectively.
+    List of DataFrames containing their respective transformed datasets (in the same order as passed).
     """
+    sklearn_func = args[-1]
     obj = sklearn_func(**func_kwargs)
-    obj.fit(train_df)  # fit on train only
+    obj.fit(args[0])  # fit on train only
 
-    transformed_train = obj.transform(train_df)
-    transformed_test = obj.transform(test_df)
+    transformed_dfs = [obj.transform(df) for df in args[:-1]]
 
-    new_cols = [f"{sklearn_func.__name__}_{i+1}" for i in range(transformed_train.shape[1])]
-    return pd.DataFrame(transformed_train, index=train_df.index, columns=new_cols), pd.DataFrame(transformed_test,  index=test_df.index,  columns=new_cols)
+    new_cols = [f"{sklearn_func.__name__}_{i+1}" for i in range(transformed_dfs[0].shape[1])]
+    return [pd.DataFrame(transformed_dfs[i], index=df.index, columns=new_cols) for i, df in enumerate(args[:-1])]
 
 def integer_index(dfs):
     """

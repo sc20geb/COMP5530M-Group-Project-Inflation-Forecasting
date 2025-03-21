@@ -6,8 +6,8 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm.autonotebook import tqdm
 import matplotlib.pyplot as plt
-from EarlyStopping import EarlyStopping
-from hyperparameters import OPTUNA_SEARCH_SPACE
+from Training.Helper.EarlyStopping import EarlyStopping
+from Training.Helper.hyperparameters import OPTUNA_SEARCH_SPACE
 
 
 def train_epoch(
