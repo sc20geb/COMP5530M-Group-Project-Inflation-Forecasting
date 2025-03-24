@@ -10,7 +10,8 @@ import logging
 import os
 
 # Get absolute path to the project root (2 levels up from this file)
-MODULE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+MODULE_PATH = os.path.abspath(os.path.join(os.getcwd(), "../.."))
+
 
 # Define paths to datasets
 TRAIN_DATA_PATH_1990S = os.path.join(MODULE_PATH, 'Data', 'Train', 'train1990s.csv')
