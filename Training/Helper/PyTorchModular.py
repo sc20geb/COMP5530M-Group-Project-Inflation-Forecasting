@@ -1,9 +1,13 @@
+import time
+import os
+import optuna
 import torch
+import torch.nn as nn
+import torch.optim as optim
 from tqdm.autonotebook import tqdm
 import matplotlib.pyplot as plt
-from EarlyStopping import EarlyStopping
-import time
-import pickle
+from Training.Helper.EarlyStopping import EarlyStopping
+from Training.Helper.hyperparameters import OPTUNA_SEARCH_SPACE
 
 
 def train_epoch(
@@ -13,6 +17,8 @@ def train_epoch(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     batchStatusUpdate: int = None,
+    gradientClipper: torch.nn.utils = None,
+    gradientClipperKwargs: dict = {},
 ):
     """
     This function trains a model for one epoch
@@ -31,6 +37,10 @@ def train_epoch(
 
     batchStatusUpdate: Informs the user what batch they are on every multiple of batchStatusUpdate. Use None to disable.
 
+    gradientClipper: (optional) a PyTorch gradient clipper
+
+    gradientClipperKwargs: (optional) Dictionary specifying any keyword arguments to gradientClipper
+
     Returns:
     --------
     average training Loss of epoch
@@ -44,27 +54,33 @@ def train_epoch(
     nSamples = 0  # accumulates number of samples per epoch (divides the total loss to find average loss)
 
     # loop over each batch:
-    for batch, (X, Y) in enumerate(dataLoader):
+    for batch, batch_data in enumerate(dataLoader):
 
-        # Put the data on the appropiate device:
-        X = X.to(device)
-        Y = Y.to(device)
+        # Unpacks batch data into inputs and targets; can handle arbitrary numbers of inputs
+        *inputs, targets = batch_data
+
+        # Put the data on the appropriate device
+        inputs = [input.to(device) for input in inputs]
+        targets = targets.to(device)
 
         # Forward pass:
-        y_pred = model(X)
+        y_pred = model(*inputs)
 
         # Calculate the loss:
-        loss = lossFn(y_pred, Y)
+        loss = lossFn(y_pred, targets)
 
         # Update training loss:
-        trainLoss += loss.item() * Y.shape[0]
-        nSamples += Y.shape[0]
+        trainLoss += loss.item() * targets.shape[0]
+        nSamples += targets.shape[0]
 
         # Remove previous gradients:
         optimizer.zero_grad()
 
         # Backwards pass:
         loss.backward()
+
+        # Apply torch.nn utilities gradient clipper function if passed:
+        if gradientClipper: gradientClipper(model.parameters(), **gradientClipperKwargs)
 
         # Improve model:
         optimizer.step()
@@ -112,19 +128,21 @@ def validate_logits(
 
     # Loop over each batch in the validation set.
     with torch.inference_mode():
-        for batch, (X, Y) in enumerate(dataLoader):
+        for batch, batch_data in enumerate(dataLoader):
+            # Unpacks batch data into inputs and targets; can handle arbitrary numbers of inputs
+            *inputs, targets = batch_data
 
-            # Put the data on the appropiate device:
-            X = X.to(device)
-            Y = Y.to(device)
+            # Put the data on the appropriate device
+            inputs = [input.to(device) for input in inputs]
+            targets = targets.to(device)
 
             # Get the predicted Logits
-            logits = model(X)
+            logits = model(*inputs)
 
             # calculate the loss:
-            loss = lossFn(logits, Y)
-            validLoss += loss.item() * Y.shape[0]
-            nSamples += Y.shape[0]
+            loss = lossFn(logits, targets)
+            validLoss += loss.item() * targets.shape[0]
+            nSamples += targets.shape[0]
             # TODO: Implement torch metrics feature:
 
     return validLoss / nSamples
@@ -140,136 +158,196 @@ def train_model(
     lossFn: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
     device: torch.device,
+    scheduler=None,
     batchStatusUpdate=None,
-    verbose=None,
+    verbose=True,
     seed=42,
+    gradientClipper=torch.nn.utils.clip_grad_norm_,
+    gradientClipperKwargs={'max_norm': 1.0},
 ):
     """
-    This function trains a model for given number of epochs.
+    This function trains a model for given number of epochs and saves the best performing model.
 
-    Parameters
+    Parameters:
     ----------
-    model: The model that needs to be trained
-
-    maxEpochs: The maximum amount of epochs to train the model (assuming early stopping does not occur).
-
-    modelSavePath: The path to the directory where the model gets saved for each epoch
-
-    modelName: The name of the model (Used for saving the model).
-
-    dataLoaderTrain: The dataloader used to train the model
-
-    dataLoaderValid: The dataloader of the validation data to evaluate the model (NOT test data).
-
-    lossFn: Loss function to evalute the model
-
-    optimizer: The optimizer used to improve the model
-
-    device: The device to run the model on
-
-    seed: Sets the random state of the model for reproducibility. Defaults to 42.
-    NOTE: random state may not be excactly the same as CUDA has its own randomness on the graphics card.
+    model: The model that needs to be trained.
+    maxEpochs: Maximum number of epochs to train the model.
+    modelSavePath: Directory where the best model will be saved.
+    modelName: Name of the model for saving.
+    dataLoaderTrain: DataLoader for training data.
+    dataLoaderValid: DataLoader for validation data.
+    lossFn: Loss function to evaluate the model.
+    optimizer: Optimizer to improve the model.
+    device: Device to run the model on ("cuda" or "cpu").
+    scheduler: (Optional) Learning rate scheduler.
+    batchStatusUpdate: (Optional) Prints batch status update frequency.
+    verbose: (Optional) Whether to print loss updates.
+    seed: (Optional) Random seed for reproducibility.
+    gradientClipper: (Optional) a PyTorch gradient clipper.
+    gradientClipperKwargs: (Optional) Dictionary specifying any keyword arguments to gradientClipper.
 
     Returns:
     --------
-    Returns dictionary of traing Data
+    Returns dictionary containing:
+    - 'trainLoss': List of training losses for each epoch.
+    - 'validLoss': List of validation losses for each epoch.
+    - 'best_model_path': Path to the saved best model.
     """
+    os.makedirs(modelSavePath, exist_ok=True)
+    best_model_path = None  # Initialize best model path
 
-    data = {
+    metaData = {
         "trainLoss": [],
         "validLoss": [],
         "times": [],
-    }  # used to store data about training for all epochs
+        "best_model_path": "",
+    }
 
-    stopper = EarlyStopping()  # initializes early stopping
+    stopper = EarlyStopping()
+    best_val_loss = float("inf")
 
-    torch.manual_seed(seed)  # sets random state
+    torch.manual_seed(seed)
 
-    # loop over each epoch
-    for epoch in tqdm(range(0, maxEpochs)):
+    for epoch in tqdm(range(0, maxEpochs), desc="Training Progress"):
+        t0 = time.time()
+        model.train()
 
-        t0 = time.time()  # sets timer for epoch
+        train_loss = train_epoch(model, dataLoaderTrain, lossFn, optimizer, device, batchStatusUpdate=batchStatusUpdate, 
+                                 gradientClipper=gradientClipper, gradientClipperKwargs=gradientClipperKwargs)
 
-        # Train model for one epoch
-        trainLoss = train_epoch(
-            model, dataLoaderTrain, lossFn, optimizer, device, batchStatusUpdate
-        )
+        metaData["trainLoss"].append(train_loss)
 
-        data["times"].append(time.time() - t0)  # add training time for epoch
+        valid_loss = validate_logits(model, dataLoaderValid, lossFn, device)
+        metaData["validLoss"].append(valid_loss)
+        metaData["times"].append(time.time() - t0)
 
-        data["trainLoss"].append(trainLoss)  # add average trainloss for epoch
+        if verbose:
+            print(f"Epoch {epoch+1}/{maxEpochs} - Train Loss: {train_loss:.6f}, Val Loss: {valid_loss:.6f}")
 
-        # validate model:
-        validLoss = validate_logits(model, dataLoaderValid, lossFn, device)
+        if scheduler:
+            scheduler.step(valid_loss)
 
-        data["validLoss"].append(validLoss)  # add validation Loss for epoch
+        # Save best model dynamically
+        if valid_loss < best_val_loss:
+            best_val_loss = valid_loss
+            best_model_path = os.path.join(modelSavePath, f"{modelName}_BEST_STOPPED_AT_{epoch+1}.pth")
+            torch.save(model.state_dict(), best_model_path)
+            metaData["best_model_path"] = best_model_path
+            print(f"Best model saved at {best_model_path} (Epoch {epoch+1})")
 
-        # Inform user of training loss and validation loss:
-        if verbose is not None:
-            print(f"Train Loss epoch {epoch}: {trainLoss}")
-            print(f"Valid Loss epoch {epoch}: {validLoss}")
-
-        # Check if model needs to stop early:
-        if stopper(model, validLoss):
-            # resore the weights with the best validation loss:
+        if stopper(model, valid_loss):
             stopper.restoreBestWeights(model)
+            print(f"Early stopping at epoch {epoch+1}. Best model restored.")
+            return metaData
 
-            # Save traing data:
-            with open(
-                f"{modelSavePath}/{modelName}_data_stopped.pickle", "wb"
-            ) as handle:
-                pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-            # Save model weights: NOTE: informs the user which epoch had the best validation loss by adding it to the name of the weights file
-            torch.save(
-                model.state_dict(),
-                f"{modelSavePath}/{modelName}_BEST_STOPPED_AT_{epoch-stopper.counter}.pth",
-            )
-            print(
-                f"Stopped at epoch: {epoch}\nBest weights at epoch: {epoch-stopper.counter}"
-            )
-            # return data for training
-            return data
-
-        # save model at each epoch (incase of failure):
-        torch.save(model.state_dict(), f"{modelSavePath}/{modelName}_latest.pth")
-
-    # If model has reached maxEpochs, return data and save model NOTE: model name will have "_UNSTOPPED" appended to inform model has not converged.
-    torch.save(model.state_dict(), f"{modelSavePath}/{modelName}_UNSTOPPED.pth")
-
-    # Save traing data:
-    with open(f"{modelSavePath}/{modelName}_data_unstopped.pickle", "wb") as handle:
-        pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-    # return data for training
-    return data
-
-
+    print(f"Training completed. Best model saved at {best_model_path}")
+    return metaData
+    
 def loss_curve(trainLoss: list, validLoss: list, title: str = None):
     """
-    This function graphs the training loss and validation loss over epochs
+    This function graphs the training loss and validation loss over epochs.
 
     Parameters:
     -----------
-    trainLoss: List of training loss's in ascending order of epochs
-
-    validLoss: List of validation loss's in ascending order of epochs
-
-    title: title of graph. If None, then no title is given
+    trainLoss: List of training losses in ascending order of epochs.
+    validLoss: List of validation losses in ascending order of epochs.
+    title: (Optional) Title of the graph.
 
     Returns:
     --------
-    Void
+    Void (Displays the graph).
     """
-    epochs = list(range(1, len(trainLoss) + 1))
-    plt.plot(epochs, trainLoss, label="train loss")
-    plt.plot(epochs, validLoss, label="valid loss")
-
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(1, len(trainLoss) + 1), trainLoss, label="Training Loss", color="blue")
+    plt.plot(range(1, len(validLoss) + 1), validLoss, label="Validation Loss", color="red")
     plt.xlabel("Epochs")
-    plt.ylabel("loss")
-
-    if title is not None:
-        plt.title(title)
-
+    plt.ylabel("Loss")
+    plt.title(title if title else "Training vs Validation Loss")
     plt.legend()
+    plt.grid(True)
     plt.show()
+
+def optuna_tune_and_train(
+    model_class,  # Any model class (GRU, LSTM, Transformer, etc.)
+    train_loader,
+    val_loader,
+    device,
+    max_epochs=50,
+    model_save_path="models",
+    model_name="Model",
+    use_best_hyperparams=False,  # Set False to force a fresh Optuna run
+    n_trials=20,  # Number of Optuna trials
+    verbose=False  # Whether or not to print out progress
+):
+    """
+    Runs Optuna hyperparameter tuning and trains the model with the best parameters.
+    """
+
+    # Step 1: Run Optuna Hyperparameter Tuning
+    study = optuna.create_study(direction="minimize", study_name=f"{model_name if model_name != 'Model' else model_class.__name__}_hyperparameter_optimisation")
+
+    def objective(trial):
+        """Objective function for Optuna hyperparameter tuning."""
+        hidden_size = trial.suggest_int("hidden_size", *OPTUNA_SEARCH_SPACE["hidden_size"])
+        num_layers = trial.suggest_int("num_layers", *OPTUNA_SEARCH_SPACE["num_layers"])
+        learning_rate = trial.suggest_float("lr", *OPTUNA_SEARCH_SPACE["lr"], log=True)
+
+        # Initialize model
+        model = model_class(input_size=1, hidden_size=hidden_size, num_layers=num_layers, output_size=1).to(device)
+        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+        criterion = nn.MSELoss()
+
+        # Train for a few epochs to evaluate performance
+        num_epochs = 10  # Shorter tuning period
+        total_loss = 0
+        model.train()
+        
+        for epoch in range(num_epochs):
+            # Use extant function to train for one epoch, reporting back the average loss on each item
+            avg_loss = train_epoch(model, train_loader, criterion, optimizer, device)
+
+            trial.report(avg_loss, epoch)
+
+            # Handle pruning (early stopping within Optuna)
+            if trial.should_prune():
+                raise optuna.exceptions.TrialPruned()
+
+        return avg_loss
+
+    # Run Optuna trials
+    if verbose: print(" Running Optuna hyperparameter tuning...")
+    study.optimize(objective, n_trials=n_trials)
+
+    # Get Best Hyperparameters
+    best_params = study.best_params
+    if verbose: print(f" Best hyperparameters found: {best_params}")
+
+    # Step 2: Train Model with Best Hyperparameters
+    model = model_class(
+        input_size=1,
+        hidden_size=best_params["hidden_size"],
+        num_layers=best_params["num_layers"],
+        output_size=1
+    ).to(device)
+
+    optimizer = optim.Adam(model.parameters(), lr=best_params["lr"])
+    lossFn = nn.MSELoss()
+
+    metadata = train_model(
+        model=model,
+        maxEpochs=max_epochs,
+        modelSavePath=model_save_path,
+        modelName=model_name,
+        dataLoaderTrain=train_loader,
+        dataLoaderValid=val_loader,
+        lossFn=lossFn,
+        optimizer=optimizer,
+        device=device,
+        verbose=True
+    )
+
+    # Save Final Model
+    torch.save(model.state_dict(), os.path.join(model_save_path, f'{model_name}.pth'))
+    if verbose: print(" Model training complete and saved!")
+
+    return model, metadata
