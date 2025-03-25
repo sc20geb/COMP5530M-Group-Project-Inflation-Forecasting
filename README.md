@@ -49,6 +49,8 @@ Repository for group 12's 2024/25 academic year COMP5530M group project on infla
 - Swithing to someone elses branch for PR
   - git switch "\<branchname>"
 
-## File Naming Conventions:  (can be changed)
+## File Naming and others:  (can be changed)
+
 - "{ModelName}_{info}.{pth|pkl}"
-- Make sure weights file is the same name as the model in the "Weights" folder
+- Models, Training and Weights to be saved in a {ModelName} folder under training. 
+- Predictions to be saved as a numpy array in the predictions folder {ModelName}.npy

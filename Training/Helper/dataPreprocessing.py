@@ -9,12 +9,16 @@ import statsmodels.api as sm
 import logging
 import os
 
-# Useful 'macros' (global variables) defining paths to train and test data 
-MODULE_PATH = os.path.abspath(os.path.join('..'))
+# Get absolute path to the project root (2 levels up from this file)
+MODULE_PATH = os.path.abspath(os.path.join(os.getcwd(), ".."))
+
+
+# Define paths to datasets
 TRAIN_DATA_PATH_1990S = os.path.join(MODULE_PATH, 'Data', 'Train', 'train1990s.csv')
 TRAIN_DATA_PATH_2000S = os.path.join(MODULE_PATH, 'Data', 'Train', 'train2000s.csv')
-TEST_DATA_PATH_1990S = os.path.join(MODULE_PATH, 'Data', 'Test', 'test1990s.csv')
-TEST_DATA_PATH_1990S = os.path.join(MODULE_PATH, 'Data', 'Test', 'test2000s.csv')
+TEST_DATA_PATH_1990S  = os.path.join(MODULE_PATH, 'Data', 'Test', 'test1990s.csv')
+TEST_DATA_PATH_2000S  = os.path.join(MODULE_PATH, 'Data', 'Test', 'test2000s.csv')
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 

@@ -11,3 +11,4 @@ jupyter==1.1.1
 seaborn==0.13.2
 pykalman==0.10.1
 optuna==4.2.1
+pmdarima
