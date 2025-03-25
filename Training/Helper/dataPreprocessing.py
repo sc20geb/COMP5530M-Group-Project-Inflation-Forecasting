@@ -8,6 +8,7 @@ from statsmodels.tsa.stattools import pacf
 import statsmodels.api as sm
 import logging
 import os
+from statsmodels.tsa.stattools import adfuller, ccf, grangercausalitytests
 
 # Get absolute path to the project root (2 levels up from this file)
 MODULE_PATH = os.path.abspath(os.path.join(os.getcwd(), "..", ".."))
@@ -521,3 +522,135 @@ def integer_index(dfs, start=0):
         returns.append(df_copy)
     if len(returns) == 1: return returns[0]
     return returns
+
+def difference2Cols(df:pd.DataFrame,col1:str,col2:str, n:int):
+    '''
+    This function differences 2 variables, to achieve stationarity
+
+    Parameters:
+    -----------
+    col1: Name of the 1st column to be differenced.
+    col2: Name of the 2nd column to be differenced.
+    df: Dataframe which has the data for col1 and col2.
+    n: The Order of differencing.
+    Returns:
+    ---------
+    A pandas dataframe with 2 columns with the differenced data (removing the nulls).
+    '''
+    return df[[col1,col2]].diff(n).iloc[n:,:]
+
+def make_sationary(df:pd.DataFrame,col1:str,col2:str ):
+
+    '''
+    This function makes 2 columns of a dataframe stationary, by taking the minimal nth difference which achieves
+    stationarity (using the dickey-fuller stationarity test with a significance level of 5%).
+
+    Parameters:
+    -----------
+    col1: Name of the 1st column, which needs to be transformed into a stationary time series.
+    col2: Name of the 2nd column, which needs to be transformed into a stationary time series.
+    df: Dataframe which has the data for col1 and col2.
+
+    Returns:
+    --------
+    Returns a pandas dataframe with 2 columns of the stationary data. NOTE: if no stationarity is achieved, NaN is returned.
+    '''
+     # Check both variables are stationary:
+    if adfuller(df[col1])[1]<0.05 and adfuller(df[col2])[1]<0.05:
+        return df[[col1,col2]]
+
+    for i in range(1,13):
+        
+        diffDf= difference2Cols(df,col1,col2,i)# Difference data to try achive stationarity
+        # Check for stationarity:
+        if adfuller(diffDf[col1])[1]<0.05 and adfuller(diffDf[col2])[1]<0.05:
+            return diffDf
+        
+    # Return NaN if no differencing achieved stationarity within 12 iterations      
+    return np.nan
+
+
+def find_best_corr(df:pd.DataFrame,col2:str, target:str='fred_PCEPI'):
+
+    '''
+    This function finds the maximal cross correlation between target and col2, using 12 lags (year).
+    NOTE: for reliable cross correlation results, the time series needs to be stationary, hence make_sationary is used.
+    NOTE: if stationarity is NOT achieved, then NaN is returned.
+
+    Parameters:
+    -----------
+    target: The name of the target column.
+    col2: The name of the other column which is used to calculate the cross correlation between the target.
+    df: Dataframe which has the data for target and col2.
+
+    Returns:
+    --------
+    returns maximal cross correlation out of the 12 time lagged cross correlation values.
+    '''
+    # Make time-series stationary:
+    stationary_df=make_sationary(df,target,col2)
+
+    # Return NaN if stationarity is NOT achieved:
+    if stationary_df is np.nan:
+        return np.nan
+    
+    # Return maximal ccf value:
+    return np.max(np.abs(ccf(stationary_df[col2],stationary_df[target],nlags=12)))
+
+
+
+def granger_causes(df:pd.DataFrame,col:str,target:str='fred_PCEPI'):
+    '''
+    Perfom granger causlaity test, where the following is tested: col granger-causes target, with a
+    5% significance level.
+
+    Parameters:
+    -----------
+    target: The name of the target column.
+    col: The name of the other column which granger-causes target.
+    df: Dataframe which has the data for target and col2.
+
+    Returns:
+    --------
+    A boolean value, True if col granger cause target, else False.
+
+    '''
+    # calculate the p-values
+    granger=grangercausalitytests(df[[target,col]],maxlag=12,verbose=False)
+
+    # loop over all the lags:
+    for key in granger.keys():
+        # Check if it is significant using 5% significance level
+        if granger[key][0]['ssr_chi2test'][1]<0.05:
+            return True
+    return False
+
+def rank_best_features(df:pd.DataFrame, targetCol:str='fred_PCEPI'):
+
+    '''
+    This function ranks the exogenous variables by ccf value.
+
+    Parameters:
+    -----------
+    df: pandas dataframe containing all the exogenous data and target data.
+
+    targetCol: name of the target column in df.
+
+    Returns:
+    --------
+    Returns pandas dataframe where the columns are ordered by ccf value in descending order.
+    '''
+
+    df_selected= df.copy()
+
+    #Calculate the cross correlation values:
+    corrs=[]
+    for exog in df_selected.columns.drop(targetCol):
+        x= find_best_corr(df_selected,exog,targetCol)
+        if x is np.nan:
+            x=0.
+        corrs.append(x)
+    
+    best_corrs=np.argsort(corrs)[::-1] +1
+
+    return df_selected.iloc[:,np.insert(best_corrs,0,0)]
