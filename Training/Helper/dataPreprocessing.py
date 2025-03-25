@@ -496,7 +496,7 @@ def sklearn_fit_transform(*args, **func_kwargs):
     new_cols = [f"{sklearn_func.__name__}_{i+1}" for i in range(transformed_dfs[0].shape[1])]
     return [pd.DataFrame(transformed_dfs[i], index=df.index, columns=new_cols) for i, df in enumerate(args[:-1])]
 
-def integer_index(dfs):
+def integer_index(dfs, start=0):
     """
     Changes the index of the provided DataFrame(s) to be integers in the range [0, len(dataframe)].
     If a list of DataFrame objects is provided, returns a list of integer-index-converted dataframes.
@@ -505,6 +505,8 @@ def integer_index(dfs):
     -----------
     dfs: list[DataFrame] or DataFrame
         (potentially several) DataFrame(s) to be converted to an integer index.
+    start: int
+        Value from which to start the index.
 
     Returns:
     --------
@@ -513,7 +515,7 @@ def integer_index(dfs):
     if type(dfs) != list: dfs = [dfs]
     returns = []
     for df in dfs:
-        int_index = np.arange(len(df))
+        int_index = np.arange(start, len(df)+start)
         df_copy = df.copy()
         df_copy.index = int_index
         returns.append(df_copy)
