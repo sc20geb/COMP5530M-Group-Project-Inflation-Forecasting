@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from glob import glob
 from pathlib import Path
-from sklearn.metrics import mean_squared_error, r2_score, root_mean_squared_error, mean_absolute_error
+from sklearn.metrics import r2_score, root_mean_squared_error, mean_absolute_error
 
 def make_evaluation_predictions(model: torch.nn.Module, val_loader: torch.utils.data.DataLoader, savepath: str = '', device=None, y_scaler=None):
     """
@@ -58,9 +58,11 @@ def make_evaluation_predictions(model: torch.nn.Module, val_loader: torch.utils.
 
     return predictions, actuals
 
-def evaluate_model(model, val_loader, y_scaler, observation_dates, device, savepath : str = '', verbose=False):
+def evaluate_model(model, val_loader, y_scaler, observation_dates, device, 
+                   print_dates : int = 10, savepath : str = '', verbose=False, 
+                   metrics=None):
     """
-    Evaluates a trained model on validation data.
+    Evaluates a trained model on validation data, plots its predictions, and returns associated metrics.
 
     Parameters:
     -----------
@@ -74,6 +76,8 @@ def evaluate_model(model, val_loader, y_scaler, observation_dates, device, savep
         The dates corresponding to validation predictions.
     device: torch.device
         The device to run predictions on (CPU/GPU).
+    print_dates: int
+        Minimum number of dates to print on the plot (earliest and latest dates are always included)
     savepath: str (optional)
         Defines the location of the file containing the weights of the model to be loaded. If not provided, it is assumed the model is already trained.
     verbose: boolean (optional)
@@ -91,33 +95,33 @@ def evaluate_model(model, val_loader, y_scaler, observation_dates, device, savep
     # Extract the dates for validation predictions
     val_dates = observation_dates[-len(actuals_inv):]
 
-    # Create a DataFrame for comparison
-    df_comparison = pd.DataFrame({
-        "Date": val_dates,
-        "Actual Inflation": actuals_inv.flatten(),
-        "Predicted Inflation": predictions_inv.flatten()
-    })
-
-    # Display the first few rows of the comparison DataFrame
-    if verbose: print(df_comparison.head())
-
     # Plot actual vs predicted Inflation values
     plt.figure(figsize=(12, 6))
-    plt.plot(df_comparison["Date"], df_comparison["Actual Inflation"], label='Actual Inflation', linestyle='-', linewidth=2)
-    plt.plot(df_comparison["Date"], df_comparison["Predicted Inflation"], label='Predicted Inflation', linestyle='--', linewidth=2)
+    ax = plt.axes()
+
+    plt.plot(val_dates, actuals_inv.flatten(), label='Actual Inflation', linestyle='-', linewidth=2)
+    plt.plot(val_dates, predictions_inv.flatten(), label='Predicted Inflation', linestyle='--', linewidth=2)
+
+    # Ensure correct number of ticks are printed, and that the earliest and latest dates are always printed
+    xlimLower, xlimUpper = ax.get_xticks()[0], ax.get_xticks()[-1]
+    newTicks = list(np.arange(xlimLower, xlimUpper+1e-5, step=(xlimUpper-xlimLower)/(print_dates-1)))
+    ax.set_xticks(newTicks)
+
     plt.xlabel("Date")
     plt.ylabel("Inflation")
-    plt.title("Comparison of Actual vs. Predicted Inflation")
+    plt.title(f"Actual vs. {type(model).__name__} Predicted PCE")
     plt.xticks(rotation=45)
     plt.legend()
     plt.grid(True)
+
     if verbose: plt.show()
 
-    # Compute RMSE for validation predictions
-    rmse = np.sqrt(mean_squared_error(actuals_inv, predictions_inv))
-    if verbose: print(f" Root Mean Squared Error (RMSE): {rmse:.6f}")
-
-    return df_comparison, rmse
+    # Create DataFrame in necessary format
+    actual_predicted_df = pd.DataFrame(np.concatenate((actuals_inv, predictions_inv), axis=1), columns=['ground_truth', type(model).__name__])
+    if metrics: model_metrics = calc_metrics(actual_predicted_df, metrics=metrics)
+    else: model_metrics = calc_metrics(actual_predicted_df)
+    # Compute metrics for validation predictions
+    return ax, model_metrics
 
 def get_best_path(savepath : str, model_name : str, stopped_at=-1) -> str:
     """
@@ -242,7 +246,7 @@ def calc_metrics(predictionsDf:pd.DataFrame, horizon = None, metrics={'RMSE': ro
     metricsDf= pd.DataFrame(columns=list(metrics.keys()))
     
     # Loop over all columns/models in the prtedictions dataframe
-    for model in predictionsDf.columns.drop('ground_truth'):#
+    for model in predictionsDf.columns.drop('ground_truth'):
         # Calculate the metrics and add them to the metrics dataframe
         for metric in metrics:
             metricsDf.loc[model, metric] = metrics[metric](predictionsDf['ground_truth'].iloc[:horizon], predictionsDf[model].iloc[:horizon])

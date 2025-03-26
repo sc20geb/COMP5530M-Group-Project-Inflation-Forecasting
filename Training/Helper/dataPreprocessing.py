@@ -23,23 +23,6 @@ TEST_DATA_PATH_2000S  = os.path.join(MODULE_PATH, 'Data', 'Test', 'test2000s.csv
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-def minMaxScale(vals: np.array) -> np.array:
-    """
-    Applies Min-Max scaling to normalize the input array between 0 and 1.
-
-    Parameters:
-    -----------
-    vals: numpy array
-        The input array to be scaled.
-
-    Returns:
-    --------
-    numpy array
-        The min-max scaled version of the input array.
-    """
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    return scaler.fit_transform(vals.reshape(-1, 1)).flatten()
-
 def apply_fft_per_sequence(data, seq_len, num_components=10):
     """
     Computes the Fast Fourier Transform (FFT) for each sequence in the input time-series data 
@@ -468,7 +451,7 @@ def drop_near_constant_cols(df, threshold=1e-6):
     return newDf, list(set(orig_cols)-set(newDf.columns))
 
 
-def sklearn_fit_transform(*args, **func_kwargs):
+def sklearn_fit_transform(*args):
     """
     Fits and transforms the provided datasets using the provided sklearn function.
     Transform is fitted on the training (first) set, then applied to the training set followed by all other sets.
@@ -479,23 +462,20 @@ def sklearn_fit_transform(*args, **func_kwargs):
         [0:n-1]: DataFrame objects, consisting of the following DataFrames at the following indices:
             0: DataFrame containing the training data.
             Other: DataFrames containing validation, test, or other data.
-        n-1: sklearn transform
+        n-1: sklearn transform object
             The transform to be applied to the data. Must implement the fit-transform sklearn API.
-    **func_kwargs: keyword arguments
-        Keyword arguments for the sklearn function
 
     Returns:
     --------
-    List of DataFrames containing their respective transformed datasets (in the same order as passed).
+    List of DataFrames containing their respective transformed datasets (in the same order as passed) and fitted scaler
     """
     sklearn_func = args[-1]
-    obj = sklearn_func(**func_kwargs)
-    obj.fit(args[0])  # fit on train only
+    sklearn_func.fit(args[0])  # fit on train only
 
-    transformed_dfs = [obj.transform(df) for df in args[:-1]]
+    transformed_dfs = [sklearn_func.transform(df) for df in args[:-1]]
 
-    new_cols = [f"{sklearn_func.__name__}_{i+1}" for i in range(transformed_dfs[0].shape[1])]
-    return [pd.DataFrame(transformed_dfs[i], index=df.index, columns=new_cols) for i, df in enumerate(args[:-1])]
+    new_cols = [f"{type(sklearn_func).__name__}_{i+1}" for i in range(transformed_dfs[0].shape[1])]
+    return [pd.DataFrame(transformed_dfs[i], index=df.index, columns=new_cols) for i, df in enumerate(args[:-1])], sklearn_func
 
 def integer_index(dfs, start=0):
     """
@@ -654,3 +634,18 @@ def rank_best_features(df:pd.DataFrame, targetCol:str='fred_PCEPI'):
     best_corrs=np.argsort(corrs)[::-1] +1
 
     return df_selected.iloc[:,np.insert(best_corrs,0,0)]
+
+def add_dimension(arr : np.array):
+    '''
+    Adds a single dimension to the end of a numpy array.
+
+    Parameters:
+    -----------
+    arr: numpy array
+        Array to which the new dimension should be added.
+
+    Returns:
+    --------
+    Numpy array with added dimension
+    '''
+    return arr.reshape(*arr.shape, 1)
