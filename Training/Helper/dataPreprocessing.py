@@ -8,6 +8,7 @@ from statsmodels.tsa.stattools import pacf
 import statsmodels.api as sm
 import logging
 import os
+import re
 from statsmodels.tsa.stattools import adfuller, ccf, grangercausalitytests
 
 # Get absolute path to the project root (2 levels up from this file)
@@ -605,7 +606,7 @@ def granger_causes(df:pd.DataFrame,col:str,target:str='fred_PCEPI'):
             return True
     return False
 
-def rank_best_features(df:pd.DataFrame, targetCol:str='fred_PCEPI'):
+def rank_best_features(df:pd.DataFrame, targetCol:str='fred_PCEPI', ccf=True, coint=True,):
 
     '''
     This function ranks the exogenous variables by ccf value.
@@ -621,19 +622,29 @@ def rank_best_features(df:pd.DataFrame, targetCol:str='fred_PCEPI'):
     Returns pandas dataframe where the columns are ordered by ccf value in descending order.
     '''
 
-    df_selected= df.copy()
+    df_ccf= df.copy()
 
     #Calculate the cross correlation values:
     corrs=[]
-    for exog in df_selected.columns.drop(targetCol):
-        x= find_best_corr(df_selected,exog,targetCol)
+    for exog in df_ccf.columns.drop(targetCol):
+        x= find_best_corr(df_ccf,exog,targetCol)
         if x is np.nan:
             x=0.
         corrs.append(x)
     
     best_corrs=np.argsort(corrs)[::-1] +1
+    df_ccf=df_ccf.iloc[:,np.insert(best_corrs,0,0)]
 
-    return df_selected.iloc[:,np.insert(best_corrs,0,0)]
+    # Calculate cointegrations:
+
+def get_untransformed_exog(df:pd.DataFrame):
+    transformedCols=[]
+    for i in df.columns:
+        match=re.findall(r'fred_.*_.*',i)
+        if match!=[]:
+            transformedCols.append(match[0])
+
+    return df.drop(transformedCols,axis=1)
 
 def add_dimension(arr : np.array):
     '''
