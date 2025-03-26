@@ -212,50 +212,6 @@ def create_sequences(data, target, seq_len, exog=None, fft_real=None, fft_imag=N
     else:
         return np.array(X), np.array(y)
 
-        
-def train_val_test_split(X, y, train_size=0.7, val_size=0.15, test_size=None):
-    """
-    Splits a dataset into training, validation, and test sets while ensuring 
-    the specified proportions sum to 1.
-
-    Parameters:
-    -----------
-    X: numpy array
-        The time-series input data.
-    y: numpy array
-        The corresponding target variable data.
-    train_size: float, default=0.7
-        The proportion of the dataset assigned to training.
-    val_size: float, default=0.15
-        The proportion of the dataset assigned to validation.
-    test_size: float, optional
-        The proportion of the dataset assigned to testing. If not provided, 
-        it is inferred as `1 - (train_size + val_size)`.
-
-    Returns:
-    --------
-    tuple:
-        - X_train (numpy array): Training input data.
-        - y_train (numpy array): Training target data.
-        - X_valid (numpy array): Validation input data.
-        - y_valid (numpy array): Validation target data.
-        - X_test (numpy array): Test input data.
-        - y_test (numpy array): Test target data.
-
-    Raises:
-    -------
-    ValueError:
-        If the sum of `train_size`, `val_size`, and `test_size` does not equal 1.
-    """
-    if test_size is None:
-        test_size = 1 - train_size - val_size
-    if not np.isclose(train_size + val_size + test_size, 1, atol=1e-6):
-        raise ValueError(f"Train, validation, and test sizes must sum to 1, got {train_size + val_size + test_size}")
-    
-    train_idx = int(len(X) * train_size)
-    val_idx = int(len(X) * (train_size + val_size))
-
-    return X[:train_idx], y[:train_idx], X[train_idx:val_idx], y[train_idx:val_idx], X[val_idx:], y[val_idx:]
 
 def load_data(train_file : str, sequence_length=48, train_size : float = 0.7, val_size : float = 0.15, test_size : float = 0.15, config={}):
     '''
