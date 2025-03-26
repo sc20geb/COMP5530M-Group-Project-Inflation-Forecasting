@@ -9,7 +9,7 @@ import statsmodels.api as sm
 import logging
 import os
 import re
-from statsmodels.tsa.stattools import adfuller, ccf, grangercausalitytests
+from statsmodels.tsa.stattools import adfuller, ccf, grangercausalitytests, coint
 
 # Get absolute path to the project root (2 levels up from this file)
 MODULE_PATH = os.path.abspath(os.path.join(os.getcwd(), "..", ".."))
@@ -551,7 +551,7 @@ def make_sationary(df:pd.DataFrame,col1:str,col2:str ):
     return np.nan
 
 
-def find_best_corr(df:pd.DataFrame,col2:str, target:str='fred_PCEPI'):
+def find_best_corr(df:pd.DataFrame,col2:str, target:str='fred_PCEPI', maxlag=12):
 
     '''
     This function finds the maximal cross correlation between target and col2, using 12 lags (year).
@@ -576,8 +576,7 @@ def find_best_corr(df:pd.DataFrame,col2:str, target:str='fred_PCEPI'):
         return np.nan
     
     # Return maximal ccf value:
-    return np.max(np.abs(ccf(stationary_df[col2],stationary_df[target],nlags=12)))
-
+    return np.max(np.abs(ccf(stationary_df[col2],stationary_df[target],nlags=maxlag)))
 
 
 def granger_causes(df:pd.DataFrame,col:str,target:str='fred_PCEPI'):
@@ -606,7 +605,7 @@ def granger_causes(df:pd.DataFrame,col:str,target:str='fred_PCEPI'):
             return True
     return False
 
-def rank_best_features(df:pd.DataFrame, targetCol:str='fred_PCEPI', ccf=True, coint=True,):
+def rank_features_ccf(df:pd.DataFrame, targetCol:str='fred_PCEPI',maxlag=12):
 
     '''
     This function ranks the exogenous variables by ccf value.
@@ -615,29 +614,43 @@ def rank_best_features(df:pd.DataFrame, targetCol:str='fred_PCEPI', ccf=True, co
     -----------
     df: pandas dataframe containing all the exogenous data and target data.
 
-    targetCol: name of the target column in df.
 
     Returns:
     --------
     Returns pandas dataframe where the columns are ordered by ccf value in descending order.
     '''
 
-    df_ccf= df.copy()
 
-    #Calculate the cross correlation values:
+    #Calculate cross correlation values:
+    ccf_cols= np.array((df.columns.copy().drop(targetCol)))
+    
     corrs=[]
-    for exog in df_ccf.columns.drop(targetCol):
-        x= find_best_corr(df_ccf,exog,targetCol)
+    for exog in ccf_cols:
+        x= find_best_corr(df,exog,targetCol, maxlag=maxlag)
         if x is np.nan:
             x=0.
         corrs.append(x)
     
-    best_corrs=np.argsort(corrs)[::-1] +1
-    df_ccf=df_ccf.iloc[:,np.insert(best_corrs,0,0)]
+    best_corrs=np.argsort(corrs)[::-1] 
+    ccf_cols=ccf_cols[best_corrs]
+    
+    return ccf_cols
 
-    # Calculate cointegrations:
+
+
 
 def get_untransformed_exog(df:pd.DataFrame):
+    '''
+    This function returns a dataframe without the transformed exogenous variables from the fred dataset (if there are too many features).
+
+    Parameters:
+    -----------
+    df: pandas dataframe containing all exogenous variables and target variable
+
+    Returns:
+    --------
+    Returns a pandas dataframe with the transformed fred variables removed.
+    '''
     transformedCols=[]
     for i in df.columns:
         match=re.findall(r'fred_.*_.*',i)
