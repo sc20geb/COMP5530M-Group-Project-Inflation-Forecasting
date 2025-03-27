@@ -8,9 +8,13 @@ from statsmodels.tsa.stattools import pacf
 import statsmodels.api as sm
 import logging
 import os
+import re
+from statsmodels.tsa.stattools import adfuller, ccf, grangercausalitytests, coint
+from collections.abc import Callable
+from math import prod
 
 # Get absolute path to the project root (2 levels up from this file)
-MODULE_PATH = os.path.abspath(os.path.join(os.getcwd(), "../.."))
+MODULE_PATH = os.path.abspath(os.path.join(os.getcwd(), "..", ".."))
 
 
 # Define paths to datasets
@@ -22,24 +26,7 @@ TEST_DATA_PATH_2000S  = os.path.join(MODULE_PATH, 'Data', 'Test', 'test2000s.csv
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-def minMaxScale(vals: np.array) -> np.array:
-    """
-    Applies Min-Max scaling to normalize the input array between 0 and 1.
-
-    Parameters:
-    -----------
-    vals: numpy array
-        The input array to be scaled.
-
-    Returns:
-    --------
-    numpy array
-        The min-max scaled version of the input array.
-    """
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    return scaler.fit_transform(vals.reshape(-1, 1)).flatten()
-
-def apply_fft_per_sequence(data, seq_len, num_components=10):
+def apply_fft_per_sequence(data : np.array, seq_len : int, num_components : int = 10):
     """
     Computes the Fast Fourier Transform (FFT) for each sequence in the input time-series data 
     and extracts the real and imaginary components.
@@ -71,7 +58,7 @@ def apply_fft_per_sequence(data, seq_len, num_components=10):
     fft_features = np.apply_along_axis(compute_fft, axis=1, arr=np.lib.stride_tricks.sliding_window_view(data, (seq_len, data.shape[1])))
     return fft_features[:, :num_components], fft_features[:, num_components:]
 
-def add_lagged_features(df, target_cols, lags=[1, 3, 6]):
+def add_lagged_features(df : pd.DataFrame, target_cols : list[str] , lags : list[int] = [1, 3, 6]):
     """
     Creates lagged features for the specified target column(s) by shifting values 
     backward in time, allowing the model to incorporate past observations as input.
@@ -93,7 +80,7 @@ def add_lagged_features(df, target_cols, lags=[1, 3, 6]):
     lagged_data = {f"{t_col}_lag{lag}": df[t_col].shift(lag) for t_col in target_cols for lag in lags}
     return df.assign(**lagged_data)
 
-def add_rolling_features(df, target_col, windows=[3, 6, 12]):
+def add_rolling_features(df : pd.DataFrame, target_col : str, windows : list[int] = [3, 6, 12]):
     '''
     Generates rolling window statistical features (mean & standard deviation) for the target column.
     
@@ -119,7 +106,7 @@ def add_rolling_features(df, target_col, windows=[3, 6, 12]):
         df[f"{target_col}_rolling_std{window}"] = df[target_col].rolling(window=window).std()
     return df
 
-def add_time_features(df, date_col: str = 'observation_date'):
+def add_time_features(df : pd.DataFrame, date_col : str = 'observation_date'):
     """
     Extracts and adds time-based features from the 'observation_date' column to 
     enhance the model's ability to capture seasonal patterns, economic cycles, 
@@ -157,7 +144,7 @@ def add_time_features(df, date_col: str = 'observation_date'):
     
     return df
 
-def add_modified_feature(df, target_col, func):
+def add_modified_feature(df : pd.DataFrame , target_col : str, func : Callable[[pd.Series], pd.Series]):
     '''
     Adds a new column to the DataFrame provided representing the target column with some function applied.
 
@@ -179,7 +166,8 @@ def add_modified_feature(df, target_col, func):
     df[f"{func.__name__}_{target_col}"] = func(df[target_col])
     return df
 
-def create_sequences(data, target, seq_len, exog=None, fft_real=None, fft_imag=None, config={'use_fft': False, 'use_exog': False}):
+def create_sequences(data : np.array, target : np.array, seq_len : int, exog : np.array = None, 
+                     fft_real : np.array = None, fft_imag : np.array = None, config : dict = {'use_fft': False, 'use_exog': False}):
     """
     Creates sequences of a specified length from the input and target data dynamically based on the provided configuration.
 
@@ -227,161 +215,8 @@ def create_sequences(data, target, seq_len, exog=None, fft_real=None, fft_imag=N
     else:
         return np.array(X), np.array(y)
 
-        
-def train_val_test_split(X, y, train_size=0.7, val_size=0.15, test_size=None):
-    """
-    Splits a dataset into training, validation, and test sets while ensuring 
-    the specified proportions sum to 1.
 
-    Parameters:
-    -----------
-    X: numpy array
-        The time-series input data.
-    y: numpy array
-        The corresponding target variable data.
-    train_size: float, default=0.7
-        The proportion of the dataset assigned to training.
-    val_size: float, default=0.15
-        The proportion of the dataset assigned to validation.
-    test_size: float, optional
-        The proportion of the dataset assigned to testing. If not provided, 
-        it is inferred as `1 - (train_size + val_size)`.
-
-    Returns:
-    --------
-    tuple:
-        - X_train (numpy array): Training input data.
-        - y_train (numpy array): Training target data.
-        - X_valid (numpy array): Validation input data.
-        - y_valid (numpy array): Validation target data.
-        - X_test (numpy array): Test input data.
-        - y_test (numpy array): Test target data.
-
-    Raises:
-    -------
-    ValueError:
-        If the sum of `train_size`, `val_size`, and `test_size` does not equal 1.
-    """
-    if test_size is None:
-        test_size = 1 - train_size - val_size
-    if not np.isclose(train_size + val_size + test_size, 1, atol=1e-6):
-        raise ValueError(f"Train, validation, and test sizes must sum to 1, got {train_size + val_size + test_size}")
-    
-    train_idx = int(len(X) * train_size)
-    val_idx = int(len(X) * (train_size + val_size))
-
-    return X[:train_idx], y[:train_idx], X[train_idx:val_idx], y[train_idx:val_idx], X[val_idx:], y[val_idx:]
-
-def load_data(train_file : str, sequence_length=48, train_size : float = 0.7, val_size : float = 0.15, test_size : float = 0.15, config={}):
-    '''
-    Loads and preprocesses time-series data for training a machine learning model.
-
-    This function:
-    - Reads a CSV file containing time-series data.
-    - Converts the date column into a datetime format.
-    - Sorts data by date.
-    - Creates lagged features, rolling statistics, and time-based features.
-    - Splits data into training, validation, and test sets.
-    - Applies feature scaling.
-    - Optionally computes Fourier Transform features.
-    - Formats data into sequences for use in time-series models.
-
-    Parameters:
-    -----------
-    train_file: str
-        The file path to the CSV containing time-series data.
-    sequence_length: int, default=48
-        The number of past time steps to use for each sequence in the model.
-    train_size: float,
-        The proportion of the dataset assigned to training.
-    val_size: float,
-        The proportion of the dataset assigned to validation.
-    test_size: float,
-        The proportion of the dataset assigned to testing.
-    config: dict, optional
-        A configuration dictionary that specifies whether to include FFT features 
-        and exogenous variables. Of the form:
-        {"use_fft": bool, "use_exog": bool}
-
-    Returns:
-    --------
-    X_train_seq, y_train_seq: numpy arrays
-        Training sequences for the model.
-    X_valid_seq, y_valid_seq: numpy arrays
-        Validation sequences.
-    X_test_seq, y_test_seq: numpy arrays
-        Test sequences.
-    observation_dates: pandas Series
-        The dates corresponding to the test set predictions.
-    scaler: MinMaxScaler or StandardScaler
-        The scaler used to normalize the input data.
-    y_scaler: MinMaxScaler or StandardScaler
-        The scaler used to normalize the target variable.
-    exog_scaler: StandardScaler (if applicable)
-        The scaler for exogenous features, if they are included.
-    '''
-
-    df = pd.read_csv(train_file)
-    df["observation_date"] = pd.to_datetime(df["observation_date"], format="%m/%Y")
-    df = df.sort_values(by="observation_date").reset_index(drop=True)
-
-    target_col = "fred_PCEPI"
-    df = add_lagged_features(df, [target_col])
-    df = add_rolling_features(df, target_col)
-    df = add_time_features(df)
-
-    df.dropna(inplace=True)
-
-    exog_cols = [col for col in df.columns if col not in ["observation_date", target_col]]
-    data = df[[target_col]].values.astype(np.float32)
-    exog_data = df[exog_cols].values.astype(np.float32) if config.get("use_exog", False) else None
-    
-    X_train, y_train, X_valid, y_valid, X_test, y_test = train_val_test_split(data, data, train_size, val_size, test_size)
-    
-    X_scaler = MinMaxScaler()
-    X_train = X_scaler.fit_transform(X_train)
-    X_valid = X_scaler.transform(X_valid)
-    X_test = X_scaler.transform(X_test)
-
-    y_scaler = MinMaxScaler()
-    y_train = y_scaler.fit_transform(y_train.reshape(-1, 1))
-    y_valid = y_scaler.transform(y_valid.reshape(-1, 1))
-    y_test = y_scaler.transform(y_test.reshape(-1, 1))
-
-    if config.get("use_fft", False):
-        train_fft_real, train_fft_imag = apply_fft_per_sequence(X_train, sequence_length)
-        valid_fft_real, valid_fft_imag = apply_fft_per_sequence(X_valid, sequence_length)
-        test_fft_real, test_fft_imag = apply_fft_per_sequence(X_test, sequence_length)
-    else:
-        train_fft_real, train_fft_imag, valid_fft_real, valid_fft_imag, test_fft_real, test_fft_imag = [None for _ in range(6)]
-    
-    if config.get("use_exog", False):
-        exog_scaler = StandardScaler()
-        X_exog_train = exog_scaler.fit_transform(exog_data[:len(X_train)])
-        X_exog_valid = exog_scaler.transform(exog_data[len(X_train):len(X_train) + len(X_valid)])
-        X_exog_test = exog_scaler.transform(exog_data[len(X_train) + len(X_valid):])
-    
-        X_train_seq, X_exog_train_seq, y_train_seq = create_sequences(X_train, y_train, sequence_length, exog=X_exog_train, fft_real=train_fft_real, fft_imag=train_fft_imag, config=config)
-        X_valid_seq, X_exog_valid_seq, y_valid_seq = create_sequences(X_valid, y_valid, sequence_length, exog=X_exog_valid, fft_real=valid_fft_real, fft_imag=valid_fft_imag, config=config)
-        X_test_seq, X_exog_test_seq, y_test_seq = create_sequences(X_test, y_test, sequence_length, exog=X_exog_test, fft_real=test_fft_real, fft_imag=test_fft_imag, config=config)
-    
-        return X_train_seq, X_exog_train_seq, y_train_seq, \
-               X_valid_seq, X_exog_valid_seq, y_valid_seq, \
-               X_test_seq, X_exog_test_seq, y_test_seq, \
-               df["observation_date"].iloc[sequence_length:], X_scaler, exog_scaler, y_scaler
-
-    # If no exogenous variables exist, return only X and y
-    X_train_seq, y_train_seq = create_sequences(X_train, y_train, sequence_length, fft_real=train_fft_real, fft_imag=train_fft_imag, config=config)
-    X_valid_seq, y_valid_seq = create_sequences(X_valid, y_valid, sequence_length, fft_real=valid_fft_real, fft_imag=valid_fft_imag, config=config)
-    X_test_seq, y_test_seq = create_sequences(X_test, y_test, sequence_length, fft_real=test_fft_real, fft_imag=test_fft_imag, config=config)
-        
-    return X_train_seq, y_train_seq, \
-        X_valid_seq, y_valid_seq, \
-        X_test_seq, y_test_seq, \
-        df["observation_date"].iloc[sequence_length:], y_scaler
-
-
-def prepare_dataloader(X, y, X_exog=None, shuffle=True, batch_size=32):
+def prepare_dataloader(X : np.array, y : np.array, X_exog : np.array = None, shuffle : bool = True, batch_size : int = 32):
     """
     Converts dataset, optionally with exogenous variables, into PyTorch DataLoader.
 
@@ -447,7 +282,7 @@ def best_lag_selection(train_series : sm.tools.typing.ArrayLike1D, max_lags : in
     if verbose: print(f" - best_lag by PACF: {best_pacf_lag}, best_lag by AIC: {best_aic_lag}")
     return selected_lag
 
-def drop_near_constant_cols(df, threshold=1e-6):
+def drop_near_constant_cols(df : pd.DataFrame, threshold : float = 1e-6):
     """
     Removes near-constant columns according to their standard deviation (for models that struggle with constant values).
 
@@ -467,7 +302,7 @@ def drop_near_constant_cols(df, threshold=1e-6):
     return newDf, list(set(orig_cols)-set(newDf.columns))
 
 
-def sklearn_fit_transform(*args, **func_kwargs):
+def sklearn_fit_transform(*args : list[pd.DataFrame, ]):
     """
     Fits and transforms the provided datasets using the provided sklearn function.
     Transform is fitted on the training (first) set, then applied to the training set followed by all other sets.
@@ -478,25 +313,22 @@ def sklearn_fit_transform(*args, **func_kwargs):
         [0:n-1]: DataFrame objects, consisting of the following DataFrames at the following indices:
             0: DataFrame containing the training data.
             Other: DataFrames containing validation, test, or other data.
-        n-1: sklearn transform
+        n-1: sklearn transform object
             The transform to be applied to the data. Must implement the fit-transform sklearn API.
-    **func_kwargs: keyword arguments
-        Keyword arguments for the sklearn function
 
     Returns:
     --------
-    List of DataFrames containing their respective transformed datasets (in the same order as passed).
+    List of DataFrames containing their respective transformed datasets (in the same order as passed) and fitted scaler
     """
     sklearn_func = args[-1]
-    obj = sklearn_func(**func_kwargs)
-    obj.fit(args[0])  # fit on train only
+    sklearn_func.fit(args[0])  # fit on train only
 
-    transformed_dfs = [obj.transform(df) for df in args[:-1]]
+    transformed_dfs = [sklearn_func.transform(df) for df in args[:-1]]
 
-    new_cols = [f"{sklearn_func.__name__}_{i+1}" for i in range(transformed_dfs[0].shape[1])]
-    return [pd.DataFrame(transformed_dfs[i], index=df.index, columns=new_cols) for i, df in enumerate(args[:-1])]
+    new_cols = [f"{type(sklearn_func).__name__}_{i+1}" for i in range(transformed_dfs[0].shape[1])]
+    return [pd.DataFrame(transformed_dfs[i], index=df.index, columns=new_cols) for i, df in enumerate(args[:-1])], sklearn_func
 
-def integer_index(dfs):
+def integer_index(dfs : list[pd.DataFrame] , start : int = 0):
     """
     Changes the index of the provided DataFrame(s) to be integers in the range [0, len(dataframe)].
     If a list of DataFrame objects is provided, returns a list of integer-index-converted dataframes.
@@ -505,6 +337,8 @@ def integer_index(dfs):
     -----------
     dfs: list[DataFrame] or DataFrame
         (potentially several) DataFrame(s) to be converted to an integer index.
+    start: int
+        Value from which to start the index.
 
     Returns:
     --------
@@ -513,9 +347,176 @@ def integer_index(dfs):
     if type(dfs) != list: dfs = [dfs]
     returns = []
     for df in dfs:
-        int_index = np.arange(len(df))
+        int_index = np.arange(start, len(df)+start)
         df_copy = df.copy()
         df_copy.index = int_index
         returns.append(df_copy)
     if len(returns) == 1: return returns[0]
     return returns
+
+def difference2Cols(df:pd.DataFrame,col1:str,col2:str, n:int):
+    '''
+    This function differences 2 variables, to achieve stationarity
+
+    Parameters:
+    -----------
+    col1: Name of the 1st column to be differenced.
+    col2: Name of the 2nd column to be differenced.
+    df: Dataframe which has the data for col1 and col2.
+    n: The Order of differencing.
+    Returns:
+    ---------
+    A pandas dataframe with 2 columns with the differenced data (removing the nulls).
+    '''
+    return df[[col1,col2]].diff(n).iloc[n:,:]
+
+def make_stationary(df:pd.DataFrame,col1:str,col2:str ):
+
+    '''
+    This function makes 2 columns of a dataframe stationary, by taking the minimal nth difference which achieves
+    stationarity (using the dickey-fuller stationarity test with a significance level of 5%).
+
+    Parameters:
+    -----------
+    col1: Name of the 1st column, which needs to be transformed into a stationary time series.
+    col2: Name of the 2nd column, which needs to be transformed into a stationary time series.
+    df: Dataframe which has the data for col1 and col2.
+
+    Returns:
+    --------
+    Returns a pandas dataframe with 2 columns of the stationary data. NOTE: if no stationarity is achieved, NaN is returned.
+    '''
+     # Check both variables are stationary:
+    if adfuller(df[col1])[1]<0.05 and adfuller(df[col2])[1]<0.05:
+        return df[[col1,col2]]
+
+    for i in range(1,13):
+        
+        diffDf= difference2Cols(df,col1,col2,i)# Difference data to try achive stationarity
+        # Check for stationarity:
+        if adfuller(diffDf[col1])[1]<0.05 and adfuller(diffDf[col2])[1]<0.05:
+            return diffDf
+        
+    # Return NaN if no differencing achieved stationarity within 12 iterations      
+    return np.nan
+
+
+def find_best_corr(df:pd.DataFrame,col2:str, target:str='fred_PCEPI', maxlag=12):
+
+    '''
+    This function finds the maximal cross correlation between target and col2, using 12 lags (year).
+    NOTE: for reliable cross correlation results, the time series needs to be stationary, hence make_stationary is used.
+    NOTE: if stationarity is NOT achieved, then NaN is returned.
+
+    Parameters:
+    -----------
+    target: The name of the target column.
+    col2: The name of the other column which is used to calculate the cross correlation between the target.
+    df: Dataframe which has the data for target and col2.
+
+    Returns:
+    --------
+    returns maximal cross correlation out of the 12 time lagged cross correlation values.
+    '''
+    # Make time-series stationary:
+    stationary_df=make_stationary(df,target,col2)
+
+    # Return NaN if stationarity is NOT achieved:
+    if stationary_df is np.nan:
+        return np.nan
+    
+    # Return maximal ccf value:
+    return np.max(np.abs(ccf(stationary_df[col2],stationary_df[target],nlags=maxlag)))
+
+
+def granger_causes(df:pd.DataFrame,col:str,target:str='fred_PCEPI'):
+    '''
+    Perfom granger causlaity test, where the following is tested: col granger-causes target, with a
+    5% significance level.
+
+    Parameters:
+    -----------
+    target: The name of the target column.
+    col: The name of the other column which granger-causes target.
+    df: Dataframe which has the data for target and col2.
+
+    Returns:
+    --------
+    A boolean value, True if col granger cause target, else False.
+
+    '''
+    # calculate the p-values
+    granger=grangercausalitytests(df[[target,col]],maxlag=12,verbose=False)
+
+    # loop over all the lags:
+    for key in granger.keys():
+        # Check if it is significant using 5% significance level
+        if granger[key][0]['ssr_chi2test'][1]<0.05:
+            return True
+    return False
+
+def rank_features_ccf(df:pd.DataFrame, targetCol:str='fred_PCEPI',maxlag=12):
+
+    '''
+    This function ranks the exogenous variables by ccf value.
+
+    Parameters:
+    -----------
+    df: pandas dataframe containing all the exogenous data and target data.
+
+
+    Returns:
+    --------
+    Returns pandas dataframe where the columns are ordered by ccf value in descending order.
+    '''
+
+
+    #Calculate cross correlation values:
+    ccf_cols= np.array((df.columns.copy().drop(targetCol)))
+
+    corrs=[]
+    for exog in ccf_cols:
+        x= find_best_corr(df,exog,targetCol, maxlag=maxlag)
+        if x is np.nan:
+            x=0.
+        corrs.append(x)
+    
+    best_corrs=np.argsort(corrs)[::-1] 
+    ccf_cols=ccf_cols[best_corrs]
+    
+    return ccf_cols
+
+def get_untransformed_exog(df:pd.DataFrame):
+    '''
+    This function returns a dataframe without the transformed exogenous variables from the fred dataset (if there are too many features).
+
+    Parameters:
+    -----------
+    df: pandas dataframe containing all exogenous variables and target variable
+
+    Returns:
+    --------
+    Returns a pandas dataframe with the transformed fred variables removed.
+    '''
+    transformedCols=[]
+    for i in df.columns:
+        match=re.findall(r'fred_.*_.*',i)
+        if match!=[]:
+            transformedCols.append(match[0])
+
+    return df.drop(transformedCols,axis=1)
+
+def add_dimension(arr : np.array):
+    '''
+    Adds a single dimension to the end of a numpy array.
+
+    Parameters:
+    -----------
+    arr: numpy array
+        Array to which the new dimension should be added.
+
+    Returns:
+    --------
+    Numpy array with added dimension
+    '''
+    return arr.reshape(*arr.shape, 1)

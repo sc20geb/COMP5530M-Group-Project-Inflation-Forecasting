@@ -20,6 +20,14 @@ Repository for group 12's 2024/25 academic year COMP5530M group project on infla
     i. If working in a virtual environment, ensure this command is being run in that context (terminals often prefix the current working directory with (.venv) to show this)
 4. Browse the notebooks and run as you wish, ensuring the kernel used matches that with which you installed the dependencies
 
+## Execution Instructions
+1. Ensure current working directory matches the directory of this file: 'pwd' or equivalent to establish location, then 'cd' or equivalent to this directory
+2. (optional) Create a virtual environment: `python -m venv ./'
+3. Ensure relevant dependencies are installed: `pip install -r requirements.txt'
+
+    i. If working in a virtual environment, ensure this command is being run in that context (terminals often prefix the current working directory with (.venv) to show this)
+4. Browse the notebooks and run as you wish, ensuring the kernel used matches that with which you installed the dependencies
+
 
 ## Git rules:
 - Make pull request in git and get someone to review changes.
