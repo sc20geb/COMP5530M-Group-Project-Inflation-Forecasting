@@ -10,6 +10,8 @@ import logging
 import os
 import re
 from statsmodels.tsa.stattools import adfuller, ccf, grangercausalitytests, coint
+from collections.abc import Callable
+from math import prod
 
 # Get absolute path to the project root (2 levels up from this file)
 MODULE_PATH = os.path.abspath(os.path.join(os.getcwd(), "..", ".."))
@@ -24,7 +26,7 @@ TEST_DATA_PATH_2000S  = os.path.join(MODULE_PATH, 'Data', 'Test', 'test2000s.csv
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-def apply_fft_per_sequence(data, seq_len, num_components=10):
+def apply_fft_per_sequence(data : np.array, seq_len : int, num_components : int = 10):
     """
     Computes the Fast Fourier Transform (FFT) for each sequence in the input time-series data 
     and extracts the real and imaginary components.
@@ -56,7 +58,7 @@ def apply_fft_per_sequence(data, seq_len, num_components=10):
     fft_features = np.apply_along_axis(compute_fft, axis=1, arr=np.lib.stride_tricks.sliding_window_view(data, (seq_len, data.shape[1])))
     return fft_features[:, :num_components], fft_features[:, num_components:]
 
-def add_lagged_features(df, target_cols, lags=[1, 3, 6]):
+def add_lagged_features(df : pd.DataFrame, target_cols : list[str] , lags : list[int] = [1, 3, 6]):
     """
     Creates lagged features for the specified target column(s) by shifting values 
     backward in time, allowing the model to incorporate past observations as input.
@@ -78,7 +80,7 @@ def add_lagged_features(df, target_cols, lags=[1, 3, 6]):
     lagged_data = {f"{t_col}_lag{lag}": df[t_col].shift(lag) for t_col in target_cols for lag in lags}
     return df.assign(**lagged_data)
 
-def add_rolling_features(df, target_col, windows=[3, 6, 12]):
+def add_rolling_features(df : pd.DataFrame, target_col : str, windows : list[int] = [3, 6, 12]):
     '''
     Generates rolling window statistical features (mean & standard deviation) for the target column.
     
@@ -104,7 +106,7 @@ def add_rolling_features(df, target_col, windows=[3, 6, 12]):
         df[f"{target_col}_rolling_std{window}"] = df[target_col].rolling(window=window).std()
     return df
 
-def add_time_features(df, date_col: str = 'observation_date'):
+def add_time_features(df : pd.DataFrame, date_col : str = 'observation_date'):
     """
     Extracts and adds time-based features from the 'observation_date' column to 
     enhance the model's ability to capture seasonal patterns, economic cycles, 
@@ -142,7 +144,7 @@ def add_time_features(df, date_col: str = 'observation_date'):
     
     return df
 
-def add_modified_feature(df, target_col, func):
+def add_modified_feature(df : pd.DataFrame , target_col : str, func : Callable[[pd.Series], pd.Series]):
     '''
     Adds a new column to the DataFrame provided representing the target column with some function applied.
 
@@ -164,7 +166,8 @@ def add_modified_feature(df, target_col, func):
     df[f"{func.__name__}_{target_col}"] = func(df[target_col])
     return df
 
-def create_sequences(data, target, seq_len, exog=None, fft_real=None, fft_imag=None, config={'use_fft': False, 'use_exog': False}):
+def create_sequences(data : np.array, target : np.array, seq_len : int, exog : np.array = None, 
+                     fft_real : np.array = None, fft_imag : np.array = None, config : dict = {'use_fft': False, 'use_exog': False}):
     """
     Creates sequences of a specified length from the input and target data dynamically based on the provided configuration.
 
@@ -213,7 +216,7 @@ def create_sequences(data, target, seq_len, exog=None, fft_real=None, fft_imag=N
         return np.array(X), np.array(y)
 
 
-def prepare_dataloader(X, y, X_exog=None, shuffle=True, batch_size=32):
+def prepare_dataloader(X : np.array, y : np.array, X_exog : np.array = None, shuffle : bool = True, batch_size : int = 32):
     """
     Converts dataset, optionally with exogenous variables, into PyTorch DataLoader.
 
@@ -279,7 +282,7 @@ def best_lag_selection(train_series : sm.tools.typing.ArrayLike1D, max_lags : in
     if verbose: print(f" - best_lag by PACF: {best_pacf_lag}, best_lag by AIC: {best_aic_lag}")
     return selected_lag
 
-def drop_near_constant_cols(df, threshold=1e-6):
+def drop_near_constant_cols(df : pd.DataFrame, threshold : float = 1e-6):
     """
     Removes near-constant columns according to their standard deviation (for models that struggle with constant values).
 
@@ -299,7 +302,7 @@ def drop_near_constant_cols(df, threshold=1e-6):
     return newDf, list(set(orig_cols)-set(newDf.columns))
 
 
-def sklearn_fit_transform(*args):
+def sklearn_fit_transform(*args : list[pd.DataFrame, ]):
     """
     Fits and transforms the provided datasets using the provided sklearn function.
     Transform is fitted on the training (first) set, then applied to the training set followed by all other sets.
@@ -325,7 +328,7 @@ def sklearn_fit_transform(*args):
     new_cols = [f"{type(sklearn_func).__name__}_{i+1}" for i in range(transformed_dfs[0].shape[1])]
     return [pd.DataFrame(transformed_dfs[i], index=df.index, columns=new_cols) for i, df in enumerate(args[:-1])], sklearn_func
 
-def integer_index(dfs, start=0):
+def integer_index(dfs : list[pd.DataFrame] , start : int = 0):
     """
     Changes the index of the provided DataFrame(s) to be integers in the range [0, len(dataframe)].
     If a list of DataFrame objects is provided, returns a list of integer-index-converted dataframes.
@@ -367,7 +370,7 @@ def difference2Cols(df:pd.DataFrame,col1:str,col2:str, n:int):
     '''
     return df[[col1,col2]].diff(n).iloc[n:,:]
 
-def make_sationary(df:pd.DataFrame,col1:str,col2:str ):
+def make_stationary(df:pd.DataFrame,col1:str,col2:str ):
 
     '''
     This function makes 2 columns of a dataframe stationary, by taking the minimal nth difference which achieves
@@ -402,7 +405,7 @@ def find_best_corr(df:pd.DataFrame,col2:str, target:str='fred_PCEPI', maxlag=12)
 
     '''
     This function finds the maximal cross correlation between target and col2, using 12 lags (year).
-    NOTE: for reliable cross correlation results, the time series needs to be stationary, hence make_sationary is used.
+    NOTE: for reliable cross correlation results, the time series needs to be stationary, hence make_stationary is used.
     NOTE: if stationarity is NOT achieved, then NaN is returned.
 
     Parameters:
@@ -416,7 +419,7 @@ def find_best_corr(df:pd.DataFrame,col2:str, target:str='fred_PCEPI', maxlag=12)
     returns maximal cross correlation out of the 12 time lagged cross correlation values.
     '''
     # Make time-series stationary:
-    stationary_df=make_sationary(df,target,col2)
+    stationary_df=make_stationary(df,target,col2)
 
     # Return NaN if stationarity is NOT achieved:
     if stationary_df is np.nan:
@@ -470,7 +473,7 @@ def rank_features_ccf(df:pd.DataFrame, targetCol:str='fred_PCEPI',maxlag=12):
 
     #Calculate cross correlation values:
     ccf_cols= np.array((df.columns.copy().drop(targetCol)))
-    
+
     corrs=[]
     for exog in ccf_cols:
         x= find_best_corr(df,exog,targetCol, maxlag=maxlag)
@@ -482,9 +485,6 @@ def rank_features_ccf(df:pd.DataFrame, targetCol:str='fred_PCEPI',maxlag=12):
     ccf_cols=ccf_cols[best_corrs]
     
     return ccf_cols
-
-
-
 
 def get_untransformed_exog(df:pd.DataFrame):
     '''

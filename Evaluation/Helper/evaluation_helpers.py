@@ -6,8 +6,9 @@ import matplotlib.pyplot as plt
 from glob import glob
 from pathlib import Path
 from sklearn.metrics import r2_score, root_mean_squared_error, mean_absolute_error
+from sklearn.base import BaseEstimator
 
-def make_evaluation_predictions(model: torch.nn.Module, val_loader: torch.utils.data.DataLoader, savepath: str = '', device=None, y_scaler=None):
+def make_evaluation_predictions(model: torch.nn.Module, val_loader: torch.utils.data.DataLoader, savepath: str = '', device=None, y_scaler : BaseEstimator = None):
     """
     Loads the model at the savepath specified, and evaluates it using the data held in val_loader.
 
@@ -21,7 +22,7 @@ def make_evaluation_predictions(model: torch.nn.Module, val_loader: torch.utils.
         Defines the location of the file containing the weights of the model to be loaded. If not provided, it is assumed the model is already trained.
     device: str (optional)
         Idenfities the device to be used when evaluating the model. If not provided, this is identified automatically.
-    y_scaler: sklearn.preprocessing.Scaler (optional)
+    y_scaler: sklearn BaseEstimator (optional)
         Scaler with which to inverse transform the predictions made by the model and its actual values.
 
 
@@ -58,9 +59,11 @@ def make_evaluation_predictions(model: torch.nn.Module, val_loader: torch.utils.
 
     return predictions, actuals
 
-def evaluate_model(model, val_loader, y_scaler, observation_dates, device, 
-                   print_dates : int = 10, savepath : str = '', verbose=False, 
-                   metrics=None):
+def evaluate_model(model : torch.nn.Module, val_loader: torch.utils.data.DataLoader, y_scaler : BaseEstimator, observation_dates : list, device : torch.device, 
+                   print_dates : int = 10, savepath : str = '', verbose : bool = False, 
+                   metrics : dict ={'RMSE': root_mean_squared_error, 
+                                    'MAE': mean_absolute_error,
+                                    'r2': r2_score}):
     """
     Evaluates a trained model on validation data, plots its predictions, and returns associated metrics.
 
@@ -70,7 +73,7 @@ def evaluate_model(model, val_loader, y_scaler, observation_dates, device,
         The trained PyTorch model to evaluate. (if savepath is passed, weights from that file are loaded into this object)
     val_loader: DataLoader
         DataLoader containing validation data.
-    y_scaler: Scaler object
+    y_scaler: BaseEstimator object
         The scaler used for inverse transforming predictions.
     observation_dates: list or pd.Series
         The dates corresponding to validation predictions.
@@ -95,12 +98,23 @@ def evaluate_model(model, val_loader, y_scaler, observation_dates, device,
     # Extract the dates for validation predictions
     val_dates = observation_dates[-len(actuals_inv):]
 
+    ax = display_results(actuals_inv.flatten(), predictions_inv.flatten(), val_dates, type(model).__name__, print_dates=print_dates)
+
+    if verbose: plt.show()
+
+    # Create DataFrame in necessary format
+    actual_predicted_df = pd.DataFrame(np.concatenate((actuals_inv, predictions_inv), axis=1), columns=['ground_truth', type(model).__name__])
+    model_metrics = calc_metrics(actual_predicted_df, metrics=metrics)
+    # Compute metrics for validation predictions
+    return ax, model_metrics
+
+def display_results(actuals : np.array, predictions : np.array, dates : list, model_name : str, print_dates : int = 10):
     # Plot actual vs predicted Inflation values
     plt.figure(figsize=(12, 6))
     ax = plt.axes()
 
-    plt.plot(val_dates, actuals_inv.flatten(), label='Actual Inflation', linestyle='-', linewidth=2)
-    plt.plot(val_dates, predictions_inv.flatten(), label='Predicted Inflation', linestyle='--', linewidth=2)
+    plt.plot(dates, actuals, label='Actual Inflation', linestyle='-', linewidth=2)
+    plt.plot(dates, predictions, label='Predicted Inflation', linestyle='--', linewidth=2)
 
     # Ensure correct number of ticks are printed, and that the earliest and latest dates are always printed
     xlimLower, xlimUpper = ax.get_xticks()[0], ax.get_xticks()[-1]
@@ -109,19 +123,11 @@ def evaluate_model(model, val_loader, y_scaler, observation_dates, device,
 
     plt.xlabel("Date")
     plt.ylabel("Inflation")
-    plt.title(f"Actual vs. {type(model).__name__} Predicted PCE")
+    plt.title(f"Actual vs. {model_name} Predicted PCE")
     plt.xticks(rotation=45)
     plt.legend()
     plt.grid(True)
-
-    if verbose: plt.show()
-
-    # Create DataFrame in necessary format
-    actual_predicted_df = pd.DataFrame(np.concatenate((actuals_inv, predictions_inv), axis=1), columns=['ground_truth', type(model).__name__])
-    if metrics: model_metrics = calc_metrics(actual_predicted_df, metrics=metrics)
-    else: model_metrics = calc_metrics(actual_predicted_df)
-    # Compute metrics for validation predictions
-    return ax, model_metrics
+    return ax
 
 def get_best_path(savepath : str, model_name : str, stopped_at=-1) -> str:
     """
