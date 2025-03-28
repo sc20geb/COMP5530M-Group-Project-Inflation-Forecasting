@@ -60,7 +60,7 @@ def make_evaluation_predictions(model: torch.nn.Module, val_loader: torch.utils.
     return predictions, actuals
 
 def evaluate_model(model : torch.nn.Module, val_loader: torch.utils.data.DataLoader, y_scaler : BaseEstimator, observation_dates : list, device : torch.device, 
-                   print_dates : int = 10, savepath : str = '', verbose : bool = False, 
+                   savepath : str = '', verbose : bool = False, display_kwargs : dict = {},
                    metrics : dict ={'RMSE': root_mean_squared_error, 
                                     'MAE': mean_absolute_error,
                                     'r2': r2_score}):
@@ -98,7 +98,7 @@ def evaluate_model(model : torch.nn.Module, val_loader: torch.utils.data.DataLoa
     # Extract the dates for validation predictions
     val_dates = observation_dates[-len(actuals_inv):]
 
-    ax = display_results(actuals_inv.flatten(), predictions_inv.flatten(), val_dates, type(model).__name__, print_dates=print_dates)
+    ax = display_results(actuals_inv.flatten(), predictions_inv.flatten(), val_dates, type(model).__name__, **display_kwargs)
 
     if verbose: plt.show()
 
@@ -108,13 +108,27 @@ def evaluate_model(model : torch.nn.Module, val_loader: torch.utils.data.DataLoa
     # Compute metrics for validation predictions
     return ax, model_metrics
 
-def display_results(actuals : np.array, predictions : np.array, dates : list, model_name : str, print_dates : int = 10):
+def display_results(actuals : np.array, predictions : np.array, dates : list, model_name : str, 
+                    print_dates : int = 10, highlight_date_indices : list[tuple[int, int]] = None, highlight_colours : list[str] = None):
     # Plot actual vs predicted Inflation values
     plt.figure(figsize=(12, 6))
     ax = plt.axes()
 
     plt.plot(dates, actuals, label='Actual Inflation', linestyle='-', linewidth=2)
     plt.plot(dates, predictions, label='Predicted Inflation', linestyle='--', linewidth=2)
+
+    #TODO: Add documentation for this feature
+    ylims = (np.concatenate((actuals, predictions)).min(), np.concatenate((actuals, predictions)).max())
+
+    if highlight_date_indices:
+        for i, indices in enumerate(highlight_date_indices):
+            if highlight_colours:
+                # Colours wrap around in case too few colours are provided
+                kwargs = {'facecolor': highlight_colours[i % len(highlight_colours)], 'step': 'pre', 'alpha': 0.5}
+            else:
+                kwargs = {'step': 'pre', 'alpha': 0.5}
+            ax.fill_between(dates[indices[0]:indices[1]+1], ylims[0], ylims[1], **kwargs)
+            
 
     # Ensure correct number of ticks are printed, and that the earliest and latest dates are always printed
     xlimLower, xlimUpper = ax.get_xticks()[0], ax.get_xticks()[-1]
@@ -246,7 +260,9 @@ def calc_metrics(predictionsDf:pd.DataFrame, horizon = None, metrics={'RMSE': ro
     '''
     # Deafult to horizon of 2 years:
     if horizon is None:
-        horizon= predictionsDf.shape[0]
+        horizon = predictionsDf.shape[0]
+    # Report if horizon is too large
+    if horizon > len(predictionsDf)-1: raise ValueError(f'Horizon {horizon} must be smaller than data availability {len(predictionsDf)}.')
 
     # create an empty dataframe with columns reprresnting an evaluation metric
     metricsDf= pd.DataFrame(columns=list(metrics.keys()))
