@@ -217,7 +217,7 @@ def get_predictions(predsPath:Path):
     # Loop over all the files in the predictions folder:
     for i in list(predsPath.glob('*.npy')):
         # Add the predictions to the predictions dataframe, where the column is the model name
-        predsDf[get_model_name(i.name)]= np.load(i)[:48]
+        predsDf[get_model_name(i.name)]= np.load(i)[:12]
     
     return predsDf
 
