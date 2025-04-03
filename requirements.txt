@@ -14,3 +14,4 @@ optuna==4.2.1
 xlrd==2.0.1
 pmdarima
 openpyxl
+darts==0.34.0
