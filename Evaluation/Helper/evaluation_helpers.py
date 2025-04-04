@@ -258,9 +258,9 @@ def calc_metrics(predictionsDf:pd.DataFrame, horizon = None, metrics={'RMSE': ro
     --------
     Returns a pandas Dataframe containg all the evaluation metrics of all the models, where each column represents a metric and each row represents a model.
     '''
-    # Deafult to horizon of 2 years:
+    # Deafult to maximal horizon
     if horizon is None:
-        horizon = predictionsDf.shape[0]
+        horizon = predictionsDf.shape[0]-1
     # Report if horizon is too large
     if horizon > len(predictionsDf)-1: raise ValueError(f'Horizon {horizon} must be smaller than data availability {len(predictionsDf)}.')
 

@@ -273,10 +273,11 @@ def optuna_tune_and_train(
     val_loader,
     device,
     max_epochs=50,
-    model_save_path="models",
+    model_save_path='.',
     model_name="Model",
     use_best_hyperparams=False,  # Set False to force a fresh Optuna run
     n_trials=20,  # Number of Optuna trials
+    return_study : bool = False,  # Whether to return the Optuna study performed
     verbose=False  # Whether or not to print out progress
 ):
     """
@@ -350,4 +351,5 @@ def optuna_tune_and_train(
     torch.save(model.state_dict(), os.path.join(model_save_path, f'{model_name}.pth'))
     if verbose: print(" Model training complete and saved!")
 
+    if return_study: return model, metadata, study
     return model, metadata

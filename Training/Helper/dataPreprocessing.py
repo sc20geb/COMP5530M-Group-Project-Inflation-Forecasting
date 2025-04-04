@@ -302,7 +302,7 @@ def drop_near_constant_cols(df : pd.DataFrame, threshold : float = 1e-6):
     return newDf, list(set(orig_cols)-set(newDf.columns))
 
 
-def sklearn_fit_transform(*args : list[pd.DataFrame, ]):
+def sklearn_fit_transform(*args : list[pd.DataFrame | StandardScaler]) -> tuple[list[pd.DataFrame], StandardScaler]:
     """
     Fits and transforms the provided datasets using the provided sklearn function.
     Transform is fitted on the training (first) set, then applied to the training set followed by all other sets.
@@ -320,13 +320,19 @@ def sklearn_fit_transform(*args : list[pd.DataFrame, ]):
     --------
     List of DataFrames containing their respective transformed datasets (in the same order as passed) and fitted scaler
     """
-    sklearn_func = args[-1]
-    sklearn_func.fit(args[0])  # fit on train only
 
+    sklearn_func = args[-1]
+    dfs_to_transform = list(args[:-1])
+    # Convert numpy arrays given to DataFrames for convenience
+    for i, arg in enumerate(args[:-1]):
+        if type(arg) == np.ndarray: dfs_to_transform[i] = pd.DataFrame(arg)
+
+    # Fit and transform the relevant DataFrames
+    sklearn_func.fit(args[0])  # fit on train only
     transformed_dfs = [sklearn_func.transform(df) for df in args[:-1]]
 
     new_cols = [f"{type(sklearn_func).__name__}_{i+1}" for i in range(transformed_dfs[0].shape[1])]
-    return [pd.DataFrame(transformed_dfs[i], index=df.index, columns=new_cols) for i, df in enumerate(args[:-1])], sklearn_func
+    return [pd.DataFrame(transformed_dfs[i], index=df.index, columns=new_cols) for i, df in enumerate(dfs_to_transform)], sklearn_func
 
 def integer_index(dfs : list[pd.DataFrame] , start : int = 0):
     """
@@ -508,7 +514,7 @@ def get_untransformed_exog(df:pd.DataFrame):
 
 def add_dimension(arr : np.array):
     '''
-    Adds a single dimension to the end of a numpy array.
+    Adds a single dimension to the end of a numpy array. (equivalent to torch.Tensor.unsqueeze(len(Tensor.shape)))
 
     Parameters:
     -----------
