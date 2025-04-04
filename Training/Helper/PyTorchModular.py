@@ -267,11 +267,37 @@ def loss_curve(trainLoss: list, validLoss: list, title: str = None):
     plt.grid(True)
     plt.show()
 
+def optuna_trial_get_kwargs(trial, search_space):
+    '''
+    Returns suggested variables of the specified type as a kwarg dictionary.
+
+    Parameters:
+    -----------
+    trial: Optuna trial with which to suggest the variables requeste
+    search_space: Dictionary with entries of the form {keyword: (type, (lowerbound, upperbound))}
+
+    Returns:
+    --------
+    kwargs: Dictionary of keyword arguments containing the values within the ranges provided suggested by the passed optuna trial.
+    '''
+    kwargs = {}
+    for key in search_space:
+        type, range = search_space[key]
+        if type == int: kwargs[key] = trial.suggest_int(key, *range)
+        elif type == float: kwargs[key] = trial.suggest_float(key, *range)
+        elif type == 'categorical': kwargs[key] = trial.suggest_categorical(key, range)
+        elif type == 'discrete_uniform': kwargs[key] = trial.suggest_discrete_uniform(key, *range)
+        elif type == 'uniform': kwargs[key] = trial.suggest_uniform(key, *range)
+        elif type == 'loguniform': kwargs[key] = trial.suggest_loguniform(key, *range)
+    return kwargs
+
 def optuna_tune_and_train(
     model_class,  # Any model class (GRU, LSTM, Transformer, etc.)
     train_loader,
     val_loader,
     device,
+    model_search_space,  # Dictionary search space for the model
+    optim_search_space,  # Dictionary search space for the optimiser
     max_epochs=50,
     model_save_path='.',
     model_name="Model",
@@ -280,6 +306,7 @@ def optuna_tune_and_train(
     return_study : bool = False,  # Whether to return the Optuna study performed
     verbose=False  # Whether or not to print out progress
 ):
+    #TODO: Fix documentation here
     """
     Runs Optuna hyperparameter tuning and trains the model with the best parameters.
     """
@@ -289,13 +316,14 @@ def optuna_tune_and_train(
 
     def objective(trial):
         """Objective function for Optuna hyperparameter tuning."""
-        hidden_size = trial.suggest_int("hidden_size", *OPTUNA_SEARCH_SPACE["hidden_size"])
-        num_layers = trial.suggest_int("num_layers", *OPTUNA_SEARCH_SPACE["num_layers"])
-        learning_rate = trial.suggest_float("lr", *OPTUNA_SEARCH_SPACE["lr"], log=True)
+
+        #TODO: Rethink this for more generalisability if no specific optimiser required (e.g. with Darts models)
+        model_kwargs = optuna_trial_get_kwargs(trial, search_space=model_search_space)
+        optim_kwargs = optuna_trial_get_kwargs(trial, search_space=optim_search_space)
 
         # Initialize model
-        model = model_class(input_size=1, hidden_size=hidden_size, num_layers=num_layers, output_size=1).to(device)
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+        model = model_class(input_size=1, **model_kwargs, output_size=1).to(device)
+        optimizer = optim.Adam(model.parameters(), **optim_kwargs)
         criterion = nn.MSELoss()
 
         # Train for a few epochs to evaluate performance
