@@ -23,6 +23,10 @@ TRAIN_DATA_PATH_2000S = os.path.join(MODULE_PATH, 'Data', 'Train', 'train2000s.c
 TEST_DATA_PATH_1990S  = os.path.join(MODULE_PATH, 'Data', 'Test', 'test1990s.csv')
 TEST_DATA_PATH_2000S  = os.path.join(MODULE_PATH, 'Data', 'Test', 'test2000s.csv')
 
+# Define standard training and validation split proportions
+TRAIN_DATA_SPLIT = 0.8
+VAL_DATA_SPLIT = 0.2
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -302,7 +306,7 @@ def drop_near_constant_cols(df : pd.DataFrame, threshold : float = 1e-6):
     return newDf, list(set(orig_cols)-set(newDf.columns))
 
 
-def sklearn_fit_transform(*args : list[pd.DataFrame, ]):
+def sklearn_fit_transform(*args : list[pd.DataFrame, ], column_names : list[str] = None):
     """
     Fits and transforms the provided datasets using the provided sklearn function.
     Transform is fitted on the training (first) set, then applied to the training set followed by all other sets.
@@ -315,6 +319,8 @@ def sklearn_fit_transform(*args : list[pd.DataFrame, ]):
             Other: DataFrames containing validation, test, or other data.
         n-1: sklearn transform object
             The transform to be applied to the data. Must implement the fit-transform sklearn API.
+    column_names: str (optional)
+        The names of the columns of the output df; must have len(column_names) == len(args[i].columns) for all i < n-1
 
     Returns:
     --------
@@ -325,7 +331,8 @@ def sklearn_fit_transform(*args : list[pd.DataFrame, ]):
 
     transformed_dfs = [sklearn_func.transform(df) for df in args[:-1]]
 
-    new_cols = [f"{type(sklearn_func).__name__}_{i+1}" for i in range(transformed_dfs[0].shape[1])]
+    if column_names: new_cols = column_names
+    else: new_cols = [f"{type(sklearn_func).__name__}_{i+1}" for i in range(transformed_dfs[0].shape[1])]
     return [pd.DataFrame(transformed_dfs[i], index=df.index, columns=new_cols) for i, df in enumerate(args[:-1])], sklearn_func
 
 def integer_index(dfs : list[pd.DataFrame] , start : int = 0):
