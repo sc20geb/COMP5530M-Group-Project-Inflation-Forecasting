@@ -23,6 +23,10 @@ TRAIN_DATA_PATH_2000S = os.path.join(MODULE_PATH, 'Data', 'Train', 'train2000s.c
 TEST_DATA_PATH_1990S  = os.path.join(MODULE_PATH, 'Data', 'Test', 'test1990s.csv')
 TEST_DATA_PATH_2000S  = os.path.join(MODULE_PATH, 'Data', 'Test', 'test2000s.csv')
 
+# Define standard training and validation split proportions
+TRAIN_DATA_SPLIT = 0.8
+VAL_DATA_SPLIT = 0.2
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -315,6 +319,8 @@ def sklearn_fit_transform(*args : list[pd.DataFrame | StandardScaler]) -> tuple[
             Other: DataFrames containing validation, test, or other data.
         n-1: sklearn transform object
             The transform to be applied to the data. Must implement the fit-transform sklearn API.
+    column_names: str (optional)
+        The names of the columns of the output df; must have len(column_names) == len(args[i].columns) for all i < n-1
 
     Returns:
     --------

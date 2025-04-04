@@ -247,7 +247,7 @@ def calc_metrics(predictionsDf:pd.DataFrame, horizon = None, metrics={'RMSE': ro
 
     Parameters:
     -----------
-    predictionsDf: a pandas datframe containg the ground truth and all the predictions for each model, organized in columns.
+    predictionsDf: a pandas DataFrame containing the ground truth and all the predictions for each model, organized in columns.
 
     horizon: number of timesteps to calculate the metrics.
 
@@ -274,3 +274,24 @@ def calc_metrics(predictionsDf:pd.DataFrame, horizon = None, metrics={'RMSE': ro
             metricsDf.loc[model, metric] = metrics[metric](predictionsDf['ground_truth'].iloc[:horizon], predictionsDf[model].iloc[:horizon])
 
     return metricsDf
+
+def calc_metrics_arrays(*prediction_arrays : np.ndarray, model_names : list[str] = None, **calc_metrics_kwargs):
+    '''
+    Provides access to calc_metrics by passing a variable number of arrays, and a list of model names.
+
+    Parameters:
+    -----------
+    prediction_arrays: a variable number of numpy arrays containing the ground truth and all the predictions for each model (in that order).
+
+    model_names (optional): a list of strings, one for each model that has had its predictions passed. If not given, the models are each associated with an integer.
+
+    calc_metrics_kwargs (optional): the keyword arguments for calc_metrics if needed (i.e. horizon : int and metrics : dict)
+
+    Returns:
+    --------
+    Returns a pandas Dataframe containg all the evaluation metrics of all the models, where each column represents a metric and each row represents a model.
+    '''
+    predictionsDf = pd.DataFrame(np.hstack((prediction_arrays)))
+    if model_names: predictionsDf.columns = ['ground_truth'] + model_names
+    else: predictionsDf.columns = ['ground_truth'] + predictionsDf.columns[1:]
+    return calc_metrics(predictionsDf, **calc_metrics_kwargs)
