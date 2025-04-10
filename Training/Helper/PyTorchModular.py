@@ -283,8 +283,8 @@ def optuna_trial_get_kwargs(trial, search_space):
     kwargs = {}
     for key in search_space:
         type, range = search_space[key]
-        if type == int: kwargs[key] = trial.suggest_int(key, *range)
-        elif type == float: kwargs[key] = trial.suggest_float(key, *range)
+        if type in [int, 'int']: kwargs[key] = trial.suggest_int(key, *range)
+        elif type in [float, 'float']: kwargs[key] = trial.suggest_float(key, *range)
         elif type == 'categorical': kwargs[key] = trial.suggest_categorical(key, range)
         elif type == 'discrete_uniform': kwargs[key] = trial.suggest_discrete_uniform(key, *range)
         elif type == 'uniform': kwargs[key] = trial.suggest_uniform(key, *range)
@@ -297,12 +297,15 @@ def optuna_tune_and_train(
     val_loader,
     device,
     model_search_space,  # Dictionary search space for the model
+    model_invariates,
     optim_search_space,  # Dictionary search space for the optimiser
     max_epochs=50,
     model_save_path='.',
     model_name="Model",
     use_best_hyperparams=False,  # Set False to force a fresh Optuna run
+    has_optimiser=True,
     n_trials=20,  # Number of Optuna trials
+    n_epochs_per_trial=10,  # Number of epochs trained per Optuna trial
     return_study : bool = False,  # Whether to return the Optuna study performed
     verbose=False  # Whether or not to print out progress
 ):
@@ -319,37 +322,44 @@ def optuna_tune_and_train(
 
         #TODO: Rethink this for more generalisability if no specific optimiser required (e.g. with Darts models)
         model_kwargs = optuna_trial_get_kwargs(trial, search_space=model_search_space)
-        optim_kwargs = optuna_trial_get_kwargs(trial, search_space=optim_search_space)
+        
 
-        # Initialize model
-        model = model_class(input_size=1, **model_kwargs, output_size=1).to(device)
-        optimizer = optim.Adam(model.parameters(), **optim_kwargs)
+        # Initialize model, optimiser, and criterion
+        model = model_class(**model_invariates, **model_kwargs).to(device)
+        if has_optimiser:
+            optim_kwargs = optuna_trial_get_kwargs(trial, search_space=optim_search_space)
+            optimizer = optim.Adam(model.parameters(), **optim_kwargs)
         criterion = nn.MSELoss()
 
         # Train for a few epochs to evaluate performance
         num_epochs = 10  # Shorter tuning period
-        total_loss = 0
         model.train()
         
         for epoch in range(num_epochs):
             # Use extant function to train for one epoch, reporting back the average loss on each item
             avg_loss = train_epoch(model, train_loader, criterion, optimizer, device)
 
-            trial.report(avg_loss, epoch)
+            # Decide hyperparameters on validation loss minimisation, not training loss minimisation
+            valid_loss = validate_logits(model, val_loader, criterion, device)
+
+            trial.report(valid_loss, epoch)
 
             # Handle pruning (early stopping within Optuna)
             if trial.should_prune():
                 raise optuna.exceptions.TrialPruned()
+            
+        # Decide hyperparameters on validation loss minimisation, not training loss minimisation
+        valid_loss = validate_logits(model, val_loader, criterion, device)
 
-        return avg_loss
+        return valid_loss
 
     # Run Optuna trials
-    if verbose: print(" Running Optuna hyperparameter tuning...")
+    if verbose: print("Running Optuna hyperparameter tuning...")
     study.optimize(objective, n_trials=n_trials)
 
     # Get Best Hyperparameters
     best_params = study.best_params
-    if verbose: print(f" Best hyperparameters found: {best_params}")
+    if verbose: print(f"Best hyperparameters found: {best_params}")
 
     # Step 2: Train Model with Best Hyperparameters
     model = model_class(
