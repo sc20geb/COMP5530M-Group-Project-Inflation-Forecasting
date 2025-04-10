@@ -292,35 +292,58 @@ def optuna_trial_get_kwargs(trial, search_space):
     return kwargs
 
 def optuna_tune_and_train(
-    model_class,  # Any model class (GRU, LSTM, Transformer, etc.)
+    model_class,
     train_loader,
     val_loader,
     device,
-    model_search_space,  # Dictionary search space for the model
+    model_search_space,
     model_invariates,
-    optim_search_space,  # Dictionary search space for the optimiser
+    optim_search_space,
     max_epochs=50,
     model_save_path='.',
-    model_name="Model",
-    use_best_hyperparams=False,  # Set False to force a fresh Optuna run
+    model_name="",
     has_optimiser=True,
-    n_trials=20,  # Number of Optuna trials
-    n_epochs_per_trial=10,  # Number of epochs trained per Optuna trial
-    return_study : bool = False,  # Whether to return the Optuna study performed
-    verbose=False  # Whether or not to print out progress
+    n_trials=20,
+    n_epochs_per_trial=10,
+    return_study=False,
+    verbose=False
 ):
-    #TODO: Fix documentation here
     """
     Runs Optuna hyperparameter tuning and trains the model with the best parameters.
+
+    Parameters:
+    -----------
+    model_class: The type of model to have hyperparameters optimised (e.g. GRU, LSTM, Transformer, etc.)
+    train_loader: DataLoader for training data
+    val_loader: DataLoader for validation data (provides validation loss that will be optimised)
+    device: torch Device on which model will be optimised
+    model_search_space: Dictionary, search space (keyword arguments mapped to a tuple containing type and range of argument) for the model
+        e.g. {"hidden_size": (int, (32, 256)), "num_layers": (int, (1, 4))}
+    model_invariates: Dictionary, model keyword arguments that do not change
+    optim_search_space: Dictionary, search space for the optimiser (same format as model_search_space)
+    max_epochs: Optional integer, the maximum number of epochs the model will train with best found hyperparmeters
+    model_save_path: Optional string, the file path to which the results of the final model's training will be saved
+    model_name: Optional string, the name of the model used to name the Optuna study
+    has_optimiser: Optional boolean, defines whether the model being trained should be trained with an optimiser
+    n_trials: Optional integer, the number of Optuna trials to perform
+    n_epochs_per_trial: Optional integer, number of epochs trained per Optuna trial
+    return_study: Optional boolean, whether to return the Optuna study performed
+    verbose: Optional boolean, whether or not to print out progress
+
+    Returns:
+    --------
+    Best-parameter trained model, training metadata, (optional) Optuna study performed.
     """
 
     # Step 1: Run Optuna Hyperparameter Tuning
-    study = optuna.create_study(direction="minimize", study_name=f"{model_name if model_name != 'Model' else model_class.__name__}_hyperparameter_optimisation")
+    study = optuna.create_study(direction="minimize",
+                                # Uses successive halving several times at different levels of pruning aggressiveness depending on whether validation performance of configurations are distinguishable after a given number of runs (per-config resource allocation)
+                                pruner=optuna.pruners.HyperbandPruner(),
+                                study_name=f"{model_name if model_name else model_class.__name__}_hyperparameter_optimisation")
 
     def objective(trial):
         """Objective function for Optuna hyperparameter tuning."""
 
-        #TODO: Rethink this for more generalisability if no specific optimiser required (e.g. with Darts models)
         model_kwargs = optuna_trial_get_kwargs(trial, search_space=model_search_space)
         
 
@@ -332,10 +355,9 @@ def optuna_tune_and_train(
         criterion = nn.MSELoss()
 
         # Train for a few epochs to evaluate performance
-        num_epochs = 10  # Shorter tuning period
         model.train()
         
-        for epoch in range(num_epochs):
+        for epoch in range(n_epochs_per_trial):
             # Use extant function to train for one epoch, reporting back the average loss on each item
             avg_loss = train_epoch(model, train_loader, criterion, optimizer, device)
 
@@ -387,7 +409,7 @@ def optuna_tune_and_train(
 
     # Save Final Model
     torch.save(model.state_dict(), os.path.join(model_save_path, f'{model_name}.pth'))
-    if verbose: print(" Model training complete and saved!")
+    if verbose: print("Model training complete and saved!")
 
     if return_study: return model, metadata, study
     return model, metadata
