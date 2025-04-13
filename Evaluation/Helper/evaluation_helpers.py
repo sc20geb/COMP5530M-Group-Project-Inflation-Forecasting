@@ -7,8 +7,9 @@ from glob import glob
 from pathlib import Path
 from sklearn.metrics import r2_score, root_mean_squared_error, mean_absolute_error
 from sklearn.base import BaseEstimator
+from Training.Helper.dataPreprocessing import inverse_transform_target_features
 
-def make_evaluation_predictions(model: torch.nn.Module, val_loader: torch.utils.data.DataLoader, savepath: str = '', device=None, y_scaler : BaseEstimator = None):
+def make_evaluation_predictions(model: torch.nn.Module, val_loader: torch.utils.data.DataLoader, savepath: str = '', device=None, y_scaler : BaseEstimator = None, y_scaler_features : list[str] = []):
     """
     Loads the model at the savepath specified, and evaluates it using the data held in val_loader.
 
@@ -24,6 +25,8 @@ def make_evaluation_predictions(model: torch.nn.Module, val_loader: torch.utils.
         Idenfities the device to be used when evaluating the model. If not provided, this is identified automatically.
     y_scaler: sklearn BaseEstimator (optional)
         Scaler with which to inverse transform the predictions made by the model and its actual values.
+    y_scaler_features: list[str] (optional)
+        The list of features the scaler was fitted on contained in the validation data.
 
 
     Returns:
@@ -54,8 +57,12 @@ def make_evaluation_predictions(model: torch.nn.Module, val_loader: torch.utils.
 
     # Inverse transform if necessary
     if y_scaler:
-        predictions = y_scaler.inverse_transform(predictions)
-        actuals = y_scaler.inverse_transform(actuals)
+        if y_scaler_features:
+            predictions = inverse_transform_target_features(y_scaler, predictions.reshape(-1), y_scaler_features).reshape(-1)
+            actuals = inverse_transform_target_features(y_scaler, actuals.reshape(-1), y_scaler_features).reshape(-1)
+        else:
+            predictions = y_scaler.inverse_transform(predictions)
+            actuals = y_scaler.inverse_transform(actuals)
 
     return predictions, actuals
 
@@ -275,7 +282,7 @@ def calc_metrics_arrays(*prediction_arrays : np.ndarray, model_names : list[str]
     --------
     Returns a pandas Dataframe containg all the evaluation metrics of all the models, where each column represents a metric and each row represents a model.
     '''
-    predictionsDf = pd.DataFrame(np.hstack((prediction_arrays)))
+    predictionsDf = pd.DataFrame(np.column_stack((prediction_arrays)))
     if model_names: predictionsDf.columns = ['ground_truth'] + model_names
     else: predictionsDf.columns = ['ground_truth'] + predictionsDf.columns[1:]
     return calc_metrics(predictionsDf, **calc_metrics_kwargs)

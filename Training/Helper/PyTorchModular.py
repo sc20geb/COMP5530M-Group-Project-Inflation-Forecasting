@@ -292,32 +292,6 @@ def optuna_tune_and_train(
     and saves the best model to the specified path.
     """
 
-    # Function for training the model for one epoch
-    def train_epoch(model, loader, criterion, optimizer, device):
-        model.train()
-        total_loss = 0
-        for X_batch, y_batch in loader:
-            X_batch, y_batch = X_batch.to(device), y_batch.to(device)
-            optimizer.zero_grad()
-            output = model(X_batch)
-            loss = criterion(output.squeeze(), y_batch)
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item()
-        return total_loss / len(loader)
-
-    # Function for validating the model
-    def validate(model, loader, criterion, device):
-        model.eval()
-        total_loss = 0
-        with torch.no_grad():
-            for X_batch, y_batch in loader:
-                X_batch, y_batch = X_batch.to(device), y_batch.to(device)
-                output = model(X_batch)
-                loss = criterion(output.squeeze(), y_batch)
-                total_loss += loss.item()
-        return total_loss / len(loader)
-
     # Optuna's objective function to optimize hyperparameters
     def objective(trial):
         hidden_size = trial.suggest_int("hidden_size", 64, 256)
@@ -345,7 +319,7 @@ def optuna_tune_and_train(
         # Train and validate the model for a few epochs
         for epoch in range(max_epochs):
             train_loss = train_epoch(model, train_loader, criterion, optimizer, device)
-            val_loss = validate(model, val_loader, criterion, device)
+            val_loss = validate_logits(model, val_loader, criterion, device)
 
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
@@ -387,7 +361,7 @@ def optuna_tune_and_train(
     patience_counter = 0
     for epoch in range(max_epochs):
         train_loss = train_epoch(best_model, train_loader, criterion, optimizer, device)
-        val_loss = validate(best_model, val_loader, criterion, device)
+        val_loss = validate_logits(best_model, val_loader, criterion, device)
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
