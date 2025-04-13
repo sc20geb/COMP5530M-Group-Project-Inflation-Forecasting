@@ -1,0 +1,10 @@
+Tide  Time-series Dense Encoder
+Simplicity and efficiency using MLP and encoder and ecoder based model
+Encoder takes in covariates, finding hidden representations then decodes these to map future predictions.
+faster than more xomplex transformer models
+
+Handles both static and dynamic covariates. 
+Uses MLPs to capture non linear dependencies
+Has residual block, one hidden layer with ReLu, and skip connection which is linear
+
+https://arxiv.org/pdf/2304.08424
