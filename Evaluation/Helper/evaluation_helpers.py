@@ -1,5 +1,6 @@
 import torch
 import os
+import sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -7,6 +8,11 @@ from glob import glob
 from pathlib import Path
 from sklearn.metrics import r2_score, root_mean_squared_error, mean_absolute_error
 from sklearn.base import BaseEstimator
+
+# Add project root directory to system path to allow finding of other helper files
+project_root = os.path.abspath(os.path.join('..'))
+sys.path.append(project_root)
+
 from Training.Helper.dataPreprocessing import inverse_transform_target_features
 
 def make_evaluation_predictions(model: torch.nn.Module, val_loader: torch.utils.data.DataLoader, savepath: str = '', device=None, y_scaler : BaseEstimator = None, y_scaler_features : list[str] = []):
