@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 from Training.Helper.EarlyStopping import EarlyStopping
 from Training.Helper.hyperparameters import OPTUNA_SEARCH_SPACE
 
+# Max depth of recursive calls that should be restricted below the default recursion limit
+MAX_DEPTH = 10
+
 
 def train_epoch(
     model: torch.nn.Module,
@@ -267,7 +270,7 @@ def loss_curve(trainLoss: list, validLoss: list, title: str = None):
     plt.grid(True)
     plt.show()
 
-def optuna_trial_get_kwargs(trial, search_space):
+def optuna_trial_get_kwargs(trial, search_space, cur_depth=0):
     '''
     Returns suggested variables of the specified type as a kwarg dictionary.
     
@@ -280,15 +283,27 @@ def optuna_trial_get_kwargs(trial, search_space):
     --------
     kwargs: Dictionary of keyword arguments containing the values within the ranges provided suggested by the passed optuna trial.
     '''
+    if cur_depth > MAX_DEPTH: raise RecursionError(f'Cannot exceed recursion depth of {MAX_DEPTH}')
     kwargs = {}
     for key in search_space:
-        type, range = search_space[key]
+        # If the type and range are found immediately, suggest values for them and fill in the dictionary
+        # Otherwise, recursively call this function to find the type and range of sub-dictionaries (until the macro-defined depth)
+        if len(search_space[key]) == 2: type, range = search_space[key]
+        else: 
+            kwargs[key] = optuna_trial_get_kwargs(trial, search_space[key], cur_depth=cur_depth+1)
+            continue
+
+        # Ask Optuna to suggest a value for each type and range found
         if type in [int, 'int']: kwargs[key] = trial.suggest_int(key, *range)
         elif type in [float, 'float']: kwargs[key] = trial.suggest_float(key, *range)
         elif type in [str, 'categorical']: kwargs[key] = trial.suggest_categorical(key, range)
         elif type == 'discrete_uniform': kwargs[key] = trial.suggest_discrete_uniform(key, *range)
         elif type == 'uniform': kwargs[key] = trial.suggest_uniform(key, *range)
         elif type == 'loguniform': kwargs[key] = trial.suggest_loguniform(key, *range)
+        else:
+            message = 'The first element in each value pair in the search space dictionary provided should be either:\n'
+            message += 'A type in [int, float, str], or\nA string in [\'int\', \'float\', \'categorical\', \'discrete_uniform\', \'uniform\', \'log_uniform\']'
+            raise ValueError(message)
     return kwargs
 
 def split_params(params : dict, search_space1 : dict, search_space2 : dict):
