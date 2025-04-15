@@ -273,8 +273,8 @@ def optuna_trial_get_kwargs(trial, search_space):
     
     Parameters:
     -----------
-    trial: Optuna trial with which to suggest the variables requeste
-    search_space: Dictionary with entries of the form {keyword: (type, (lowerbound, upperbound))}
+    trial: Optuna trial with which to suggest the variables requested.
+    search_space: Dictionary with entries of the form {keyword: (type, (lowerbound, upperbound))}.
 
     Returns:
     --------
@@ -285,11 +285,27 @@ def optuna_trial_get_kwargs(trial, search_space):
         type, range = search_space[key]
         if type in [int, 'int']: kwargs[key] = trial.suggest_int(key, *range)
         elif type in [float, 'float']: kwargs[key] = trial.suggest_float(key, *range)
-        elif type == 'categorical': kwargs[key] = trial.suggest_categorical(key, range)
+        elif type in [str, 'categorical']: kwargs[key] = trial.suggest_categorical(key, range)
         elif type == 'discrete_uniform': kwargs[key] = trial.suggest_discrete_uniform(key, *range)
         elif type == 'uniform': kwargs[key] = trial.suggest_uniform(key, *range)
         elif type == 'loguniform': kwargs[key] = trial.suggest_loguniform(key, *range)
     return kwargs
+
+def split_params(params : dict, search_space1 : dict, search_space2 : dict):
+    '''
+    Splits the dictionary of parameters provided into two that share the keys of the first and second search spaces provided
+    
+    Parameters:
+    -----------
+    params: Dictionary containing the parameters to be split.
+    search_space1: Dictionary containing the keys included in the first split.
+    search_space2: Dictionary containing the keys included in the second split.
+
+    Returns:
+    --------
+    (Dictionary containing first split, Dictionary containing second split).
+    '''
+    return {key: params[key] for key in params if key in search_space1}, {key: params[key] for key in params if key in search_space2}
 
 def optuna_tune_and_train(
     model_class,
@@ -379,11 +395,15 @@ def optuna_tune_and_train(
     best_params = study.best_params
     if verbose: print(f"Best hyperparameters found: {best_params}")
 
-    # Build the final model with the best hyperparameters
-    #TODO: Just loading best_params into here does not work as these include the parameters for the optimiser - need to split them
-    best_model = model_class(**model_invariates, **best_params).to(device)
+    # Split the best parameters found by the trial into the model's and the optimiser's
+    if has_optimiser: model_best_params, optimiser_best_params = split_params(best_params, model_search_space, optim_search_space)
+    else: model_best_params = best_params
 
-    optimizer = optim.Adam(best_model.parameters(), lr=best_params["lr"], weight_decay=best_params["weight_decay"])
+    # Build the final model with the best hyperparameters
+    #TODO: Ensure has_optimiser stuff works - i.e. compatability with DARTS models
+    best_model = model_class(**model_invariates, **model_best_params).to(device)
+
+    if has_optimiser: optimizer = optim.Adam(best_model.parameters(), **optimiser_best_params)
     criterion = nn.MSELoss()
 
     # Final training loop with the best hyperparameters
@@ -401,7 +421,7 @@ def optuna_tune_and_train(
     )
 
     # Save Final Model
-    torch.save(best_model.state_dict(), os.path.join(model_save_path, f'{model_name}.pth'))
+    torch.save(best_model.state_dict(), os.path.join(model_save_path, f'{model_name}_best.pth'))
     if verbose: print("Model training complete and saved!")
 
     if return_study: return best_model, metadata, study
