@@ -270,7 +270,19 @@ def loss_curve(trainLoss: list, validLoss: list, title: str = None):
     plt.grid(True)
     plt.show()
 
-def split_args_list(lst):
+def split_arg_list(lst : list):
+    '''
+    Splits a list of arguments into a list of regular arguments and a single keyword argument dictionary. (both are blank if not found)
+        Note: If several dictionaries are included in the list, the final dictionary is considered the definitive dictionary of keyword arguments.
+    
+    Parameters:
+    -----------
+    lst: list containing the arguments to be split.
+
+    Returns:
+    --------
+    (list of arguments, dictionary of keyword arguments).
+    '''
     args = []
     kwargs = {}
     for el in lst:
@@ -281,11 +293,17 @@ def split_args_list(lst):
 def optuna_trial_get_kwargs(trial, search_space, cur_depth=0):
     '''
     Returns suggested variables of the specified type as a kwarg dictionary.
+    Search spaces should be formatted as below:
+    {'example_hyperparameter_name': (type, *args, kwargs), ...}
+        where type is in [int, float, str, 'discrete_uniform', 'uniform', 'loguniform'],
+        args is an arbitrary number of arguments to the suggest_ function (e.g. 1, 10 for a lower and upper bound), and
+        kwargs is a dictionary of keyword arguments to the suggest_ function containing: {keyword: argument, ...}
+            where keywords are strings and arguments are their associated values
     
     Parameters:
     -----------
     trial: Optuna trial with which to suggest the variables requested.
-    search_space: Dictionary with entries of the form {keyword: (type, (lowerbound, upperbound))}.
+    search_space: Dictionary with entries of the form {keyword: (type, lowerbound, upperbound, ...)}.
 
     Returns:
     --------
@@ -297,10 +315,10 @@ def optuna_trial_get_kwargs(trial, search_space, cur_depth=0):
         # If the type, arguments, and keyword arguments are found immediately, suggest values for them and fill in dictionary
         # Otherwise, recursively call this function to find the type and range of sub-dictionaries (until the macro-defined depth)
         if type(search_space[key]) == dict:
-            kwargs[key] = optuna_trial_get_kwargs(trial, search_space[key])
+            kwargs[key] = optuna_trial_get_kwargs(trial, search_space[key], cur_depth=cur_depth+1)
             continue
         else:
-            args_plus_type, func_kwargs = split_args_list(search_space[key])
+            args_plus_type, func_kwargs = split_arg_list(search_space[key])
             ty, *args = args_plus_type
         # Ask Optuna to suggest a value for each type and arguments found
         if ty in [int, 'int']: kwargs[key] = trial.suggest_int(key, *args, **func_kwargs)
