@@ -270,6 +270,14 @@ def loss_curve(trainLoss: list, validLoss: list, title: str = None):
     plt.grid(True)
     plt.show()
 
+def split_args_list(lst):
+    args = []
+    kwargs = {}
+    for el in lst:
+        if type(el) == dict: kwargs = el
+        else: args.append(el)
+    return args, kwargs
+
 def optuna_trial_get_kwargs(trial, search_space, cur_depth=0):
     '''
     Returns suggested variables of the specified type as a kwarg dictionary.
@@ -286,20 +294,21 @@ def optuna_trial_get_kwargs(trial, search_space, cur_depth=0):
     if cur_depth > MAX_DEPTH: raise RecursionError(f'Cannot exceed recursion depth of {MAX_DEPTH}')
     kwargs = {}
     for key in search_space:
-        # If the type and range are found immediately, suggest values for them and fill in the dictionary
+        # If the type, arguments, and keyword arguments are found immediately, suggest values for them and fill in dictionary
         # Otherwise, recursively call this function to find the type and range of sub-dictionaries (until the macro-defined depth)
-        if len(search_space[key]) == 2: type, range = search_space[key]
-        else: 
-            kwargs[key] = optuna_trial_get_kwargs(trial, search_space[key], cur_depth=cur_depth+1)
+        if type(search_space[key]) == dict:
+            kwargs[key] = optuna_trial_get_kwargs(trial, search_space[key])
             continue
-
-        # Ask Optuna to suggest a value for each type and range found
-        if type in [int, 'int']: kwargs[key] = trial.suggest_int(key, *range)
-        elif type in [float, 'float']: kwargs[key] = trial.suggest_float(key, *range)
-        elif type in [str, 'categorical']: kwargs[key] = trial.suggest_categorical(key, range)
-        elif type == 'discrete_uniform': kwargs[key] = trial.suggest_discrete_uniform(key, *range)
-        elif type == 'uniform': kwargs[key] = trial.suggest_uniform(key, *range)
-        elif type == 'loguniform': kwargs[key] = trial.suggest_loguniform(key, *range)
+        else:
+            args_plus_type, func_kwargs = split_args_list(search_space[key])
+            ty, *args = args_plus_type
+        # Ask Optuna to suggest a value for each type and arguments found
+        if ty in [int, 'int']: kwargs[key] = trial.suggest_int(key, *args, **func_kwargs)
+        elif ty in [float, 'float']: kwargs[key] = trial.suggest_float(key, *args, **func_kwargs)
+        elif ty in [str, 'categorical']: kwargs[key] = trial.suggest_categorical(key, *args, **func_kwargs)
+        elif ty == 'discrete_uniform': kwargs[key] = trial.suggest_discrete_uniform(key, *args, **func_kwargs)
+        elif ty == 'uniform': kwargs[key] = trial.suggest_uniform(key, *args, **func_kwargs)
+        elif ty == 'loguniform': kwargs[key] = trial.suggest_loguniform(key, *args, **func_kwargs)
         else:
             message = 'The first element in each value pair in the search space dictionary provided should be either:\n'
             message += 'A type in [int, float, str], or\nA string in [\'int\', \'float\', \'categorical\', \'discrete_uniform\', \'uniform\', \'log_uniform\']'
