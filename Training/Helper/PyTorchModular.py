@@ -6,8 +6,8 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm.autonotebook import tqdm
 import matplotlib.pyplot as plt
-from Training.Helper.EarlyStopping import EarlyStopping
-from Training.Helper.hyperparameters import OPTUNA_SEARCH_SPACE
+from Training.Helper.EarlyStopping import EarlyStopping  #added prefix so import was recognised
+from darts.metrics import mse
 
 # Max depth of recursive calls that should be restricted below the default recursion limit
 MAX_DEPTH = 10
@@ -349,7 +349,7 @@ def split_params(params : dict, search_space1 : dict, search_space2 : dict):
     '''
     return {key: params[key] for key in params if key in search_space1}, {key: params[key] for key in params if key in search_space2}
 
-def optuna_tune_and_train(
+def optuna_tune_and_train_pytorch(
     model_class,
     train_loader,
     val_loader,
@@ -358,6 +358,7 @@ def optuna_tune_and_train(
     model_invariates,
     optim_search_space,
     max_epochs=50,
+    objective=None,
     model_save_path='.',
     model_name="",
     has_optimiser=True,
@@ -367,7 +368,7 @@ def optuna_tune_and_train(
     verbose=False
 ):
     """
-    Runs Optuna hyperparameter tuning and trains the model with the best parameters.
+    Runs Optuna hyperparameter tuning for PyTorch models and trains the model with the best parameters.
 
     Parameters:
     -----------
@@ -376,10 +377,11 @@ def optuna_tune_and_train(
     val_loader: DataLoader for validation data (provides validation loss that will be optimised)
     device: torch Device on which model will be optimised
     model_search_space: Dictionary, search space (keyword arguments mapped to a tuple containing type and range of argument) for the model
-        e.g. {"hidden_size": (int, (32, 256)), "num_layers": (int, (1, 4))}
+        e.g. {"hidden_size": (int, 32, 256), "num_layers": (int, 1, 4)}
     model_invariates: Dictionary, model keyword arguments that do not change
     optim_search_space: Dictionary, search space for the optimiser (same format as model_search_space)
     max_epochs: Optional integer, the maximum number of epochs the model will train with best found hyperparmeters
+    objective: Optional objective function to be used in the Optuna study instead of the default
     model_save_path: Optional string, the file path to which the results of the final model's training will be saved
     model_name: Optional string, the name of the model used to name the Optuna study
     has_optimiser: Optional boolean, defines whether the model being trained should be trained with an optimiser
@@ -399,7 +401,7 @@ def optuna_tune_and_train(
                                 pruner=optuna.pruners.HyperbandPruner(),
                                 study_name=f"{model_name if model_name else model_class.__name__}_hyperparameter_optimisation")
 
-    def objective(trial):
+    def obj(trial):
         """Objective function for Optuna hyperparameter tuning."""
 
         model_kwargs = optuna_trial_get_kwargs(trial, search_space=model_search_space)
@@ -431,7 +433,8 @@ def optuna_tune_and_train(
 
     # Run Optuna trials
     if verbose: print("Running Optuna hyperparameter tuning...")
-    study.optimize(objective, n_trials=n_trials)
+    if objective: obj = objective
+    study.optimize(obj, n_trials=n_trials)
 
     # Get the best hyperparameters from the study
     best_params = study.best_params
@@ -468,3 +471,114 @@ def optuna_tune_and_train(
 
     if return_study: return best_model, metadata, study
     return best_model, metadata
+
+def optuna_tune_and_train_darts(model_class,
+                                train_target, val_target, train_exo, val_exo,
+                                model_search_space, model_invariates,
+                                max_epochs=50,
+                                objective=None,
+                                model_save_path='.', model_name="",
+                                n_trials=20, n_epochs_per_trial=10, criterion=mse,
+                                return_study=False, verbose=False):
+    """
+    Runs Optuna hyperparameter tuning for Darts models and trains the model with the best parameters.
+
+    Parameters:
+    -----------
+    model_class: The type of model to have hyperparameters optimised (e.g. TiDE)
+    train_target: TimeSeries with training target data
+    val_target: TimeSeries with validation data (provides validation loss that will be optimised)
+    model_search_space: Dictionary, search space (keyword arguments mapped to a tuple containing type and range of argument) for the model
+        e.g. {'input_chunk_length': (int, 24, 60),'num_encoder_layers': (int, 1, 3),'dropout': (float, 0.1, 0.5, {'log': True}),'optimizer_kwargs': {"lr": (float, 1e-4, 1e-2)}}
+    model_invariates: Dictionary, model keyword arguments that do not change
+    max_epochs: Optional integer, the maximum number of epochs the model will train with best found hyperparmeters
+    objective: Optional objective function to be used in the Optuna study instead of the default
+    model_save_path: Optional string, the file path to which the results of the final model's training will be saved
+    model_name: Optional string, the name of the model used to name the Optuna study
+    n_trials: Optional integer, the number of Optuna trials to perform
+    n_epochs_per_trial: Optional integer, number of epochs trained per Optuna trial
+    return_study: Optional boolean, whether to return the Optuna study performed
+    verbose: Optional boolean, whether or not to print out progress
+
+    Returns:
+    --------
+    Best-parameter trained model, training metadata, (optional) Optuna study performed.
+    """
+    
+    # Create an optuna study
+    study = optuna.create_study(direction="minimize",
+                                # Uses successive halving several times at different levels of pruning aggressiveness depending on whether validation performance of configurations are distinguishable after a given number of runs (per-config resource allocation)
+                                pruner=optuna.pruners.HyperbandPruner(),
+                                study_name=f"{model_name if model_name else model_class.__name__}_hyperparameter_optimisation")
+
+    def obj(trial):
+        model_kwargs = optuna_trial_get_kwargs(trial, model_search_space)
+
+        #scaled_train_exo_ranked, scaled_val_exo_ranked = get_optuna_ranked_series(trial, scaled_train_exo_r, scaled_val_exo_r, ranked_features)
+
+        # Initialize the TiDEModel with suggested hyperparameters
+        model = model_class(**model_kwargs, **model_invariates)
+
+        # Fit the model
+        model.fit(series = train_target,
+                past_covariates = train_exo,
+                val_series = val_target,
+                val_past_covariates = val_exo,
+                epochs=n_epochs_per_trial,
+                verbose = verbose)
+
+        # Evaluate the model
+        # (this is an alternative option for evaluation, where the model must predict the final prediction_size elements of the validation data having been given all other validation data;
+        #  if switching to this method, ensure that final prediction is performed with the same setup (this is currently done just by predicting the next n values))
+        #scaled_val_predictions = model.predict(n=prediction_size,series=scaled_val_target[:-prediction_size],past_covariates=scaled_val_exo[:-prediction_size], verbose=False)]
+        #val_predictions = targetScaler.inverse_transform(scaled_val_predictions, verbose=False)
+        #error = mse(val_target[-prediction_size:], val_predictions, verbose=False)
+
+        prediction_size = model.output_chunk_length
+        # Raw output is scaled, so inverse transform to become comparable with validation set
+        val_predictions = model.predict(n=prediction_size, verbose=verbose)
+        # Only uses the first prediction_size values of val_target, since this is the size of the prediction made by the model
+        error = criterion(val_target[:prediction_size], val_predictions, verbose=False)
+        return error
+    
+    # Optimise the study
+    if verbose: print("Running Optuna hyperparameter tuning...")
+    if objective: obj = objective
+    study.optimize(obj, n_trials=n_trials)
+
+    best_params = reformat_best_params(study.best_params, model_search_space)
+    best_model = model_class(**best_params, **model_invariates)
+
+    best_model.fit(series=train_target,
+               past_covariates=train_exo,
+               val_series=val_target,
+               val_past_covariates=val_exo,
+               epochs=max_epochs,
+               verbose=verbose)
+    
+    best_model.save(os.path.join(model_save_path, f"{model_name if model_name else model_class.__name__}.pkl"))
+    
+    if return_study: return best_model, study
+    return best_model
+
+
+
+def reformat_best_params(best_params : dict, formatting_dict : dict, cur_depth : int = 0):
+    '''
+    Reformats the provided dictionary of parameters into the same format as the dictionary provided.
+    
+    Parameters:
+    -----------
+    best_params: Dictionary containing the best parameters (extracted from an Optuna study)
+    formatting_dict: Dictionary containing the same keys as those of the best parameters, but potentially in a distinct format.
+
+    Returns:
+    --------
+    Dictionary in the same format as formatting_dict, but containing the values in best_params.
+    '''
+    if cur_depth > MAX_DEPTH: raise RecursionError(f'Cannot exceed recursion depth of {MAX_DEPTH}')
+    reformatted = {}
+    for key in formatting_dict:
+        if key in best_params: reformatted[key] = best_params[key]
+        else: reformatted[key] = reformat_best_params(best_params, formatting_dict[key], cur_depth=cur_depth+1)
+    return reformatted
