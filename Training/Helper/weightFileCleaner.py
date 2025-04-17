@@ -3,6 +3,7 @@
 import os
 from glob import glob
 from pathlib import Path
+from re import fullmatch
 
 def cleanWeightFiles(modelName : str, earlyStopped:bool = True, dirPath: str = os.path.join('.'), verbose=False):
     """
@@ -20,15 +21,14 @@ def cleanWeightFiles(modelName : str, earlyStopped:bool = True, dirPath: str = o
     --------
     void
     """
+    # Captures entire filename depending on whether should only delete early-stopped or not
+    pattern = f'{modelName}_BEST_STOPPED_AT_\\d+\\.pth' if earlyStopped else f'{modelName}.*\\.pth'
+
+    # If finds a match to the regex specified above, remove the file (and inform the user of which file if verbose)
     dirPath = Path(dirPath)
     for filePath in dirPath.glob('*.pth'):
         fileName = filePath.name
-        if modelName not in fileName: continue
-        if earlyStopped:
-            if 'BEST_STOPPED_AT' in fileName:
-                os.remove(os.path.join(dirPath, fileName))
-                if verbose: print(f'Removed file at: {os.path.join(dirPath, fileName)}')
-            else: continue
-        else:
+        match = fullmatch(pattern, fileName)
+        if match: 
             os.remove(os.path.join(dirPath, fileName))
             if verbose: print(f'Removed file at: {os.path.join(dirPath, fileName)}')
