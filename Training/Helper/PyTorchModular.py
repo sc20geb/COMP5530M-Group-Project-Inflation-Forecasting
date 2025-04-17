@@ -10,7 +10,7 @@ import numpy as np
 from sklearn.metrics import root_mean_squared_error
 from darts import TimeSeries
 from darts.dataprocessing.transformers import Scaler
-import pytorch_lightning.callbacks.early_stopping.EarlyStopping
+import pytorch_lightning
 from darts.utils.likelihood_models import QuantileRegression
 import pandas as pd
 import json
