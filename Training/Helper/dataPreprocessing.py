@@ -527,3 +527,38 @@ def add_dimension(arr : np.array):
     Numpy array with added dimension
     '''
     return arr.reshape(*arr.shape, 1)
+
+# Random Forest builder func
+def build_feature_matrix(
+    df: pd.DataFrame,
+    *,
+    target_col: str,
+    n_lags: int,
+    exog_cols: list[str],
+    drop_na: bool = True,
+) -> tuple[pd.DataFrame, pd.Series]:
+    """
+    Create lag + exogenous feature matrix.
+
+    Parameters
+    ----------
+    df : DataFrame with at least `target_col` and `exog_cols`
+    target_col : str  – column to forecast
+    n_lags : int      – number of past lags to add
+    exog_cols : list[str] – extra regressors
+    drop_na : bool    – if True, drop rows that still have NaN after lagging
+
+    Returns
+    -------
+    X, y : DataFrame, Series
+    """
+    df = df.copy()
+    for lag in range(1, n_lags + 1):
+        df[f"lag_{lag}"] = df[target_col].shift(lag)
+
+    feature_cols = [f"lag_{lag}" for lag in range(1, n_lags + 1)] + exog_cols
+
+    if drop_na:
+        df = df.dropna(subset=feature_cols + [target_col]).reset_index(drop=True)
+
+    return df[feature_cols], df[target_col]
