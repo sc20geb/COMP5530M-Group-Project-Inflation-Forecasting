@@ -6,8 +6,15 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm.autonotebook import tqdm
 import matplotlib.pyplot as plt
-from Training.Helper.EarlyStopping import EarlyStopping
-from Training.Helper.hyperparameters import OPTUNA_SEARCH_SPACE
+import numpy as np
+from sklearn.metrics import root_mean_squared_error
+from darts import TimeSeries
+from darts.dataprocessing.transformers import Scaler
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from darts.utils.likelihood_models import QuantileRegression
+import pandas as pd
+import json
+
 
 # Max depth of recursive calls that should be restricted below the default recursion limit
 MAX_DEPTH = 10
@@ -450,3 +457,229 @@ def optuna_tune_and_train(
 
     if return_study: return best_model, metadata, study
     return best_model, metadata
+
+
+def load_prediction(input_size:int, df_exog:pd.DataFrame,target_series:pd.Series,exog_scaler:Scaler, target_scaler:Scaler, pred_date:pd.DatetimeIndex):
+    '''
+    This function loads an input_size amount of data points before pred_date from df_exog and target_series and instantiates a darts TimeSeries object with scaled values
+    from the relevant fitted scalers.
+    NOTE: target_series and df_exog MUST have a date-time index.
+
+    Parameters:
+    -----------
+    input_size: An integer representing the number of previous data points to be loaded.
+
+    df_exog: A pandas dataframe with a date-time index, representing a dataframe of exogenous variables.
+
+    target_series: A pandas Series, representing the target time series.
+
+    exog_scaler: darts Scaler Object for the exogenous variables
+
+    target_scaler: darts Scaler Object for the target series 
+
+    Pred_date: The date which needs to be predicted. 
+
+    Returns:
+    --------
+    Returns Darts TimeSeries object of Scaled exogenous variables and scaled target time series of length: input_size, before pred_date.
+    '''
+    X=TimeSeries.from_dataframe(df_exog.loc[pred_date-pd.DateOffset(months=input_size):pred_date-pd.DateOffset(months=1),:], freq=pd.DateOffset(months=1))
+    y_past= TimeSeries.from_series(target_series.loc[pred_date-pd.DateOffset(months=input_size):pred_date-pd.DateOffset(months=1)], freq=pd.DateOffset(months=1))
+
+    return exog_scaler.transform(X), target_scaler.transform(y_past)
+
+def train_valid_split_darts(exog_df:pd.DataFrame, target_series:pd.Series, valid_size:int,input_size:int):
+    '''
+    Splits the data into a training and validation set, where the validation has a partial overlap with the training data (NOT the other way around) to minimize data wastage.
+    train set size= total size - valid_size
+    valid set size = valid_size + input_size
+
+    Parameters:
+    -----------
+    exog_df: Pandas Dataframe containing the exogenous variables.
+
+    target_series: Pandas Series containing the target time series.
+
+    valid_size: The number of predictions the validation set should have.
+
+    input_size: The number of previous time points required to make a prediction.
+
+    Returns:
+    --------
+    Returns train_target, valid_target, train_exog, valid_exog
+    '''
+
+    train_target= TimeSeries.from_series(target_series.iloc[:-valid_size])
+    valid_target= TimeSeries.from_series(target_series.iloc[-valid_size-input_size:])
+
+    train_exog= TimeSeries.from_dataframe(exog_df.iloc[:-valid_size,:])
+    valid_exog= TimeSeries.from_dataframe(exog_df.iloc[-valid_size-input_size:,:])
+
+    return train_target, valid_target, train_exog, valid_exog
+
+
+def darts_optuna(model_cls:object,model_name:str,model_search_space:dict,
+                  invariates_kwargs:dict, target_series:pd.Series,
+                  exog_df:pd.DataFrame,valid_size:int,horizon:int,
+                  n_trials:int=100,patience:int=5,tol:float=1e-5,verbose:bool=True):
+
+    '''
+    Finds opptimal hyper-parameters for a given model class (model_cls) and a search space (model_search_space).
+    NOTE: target_series and exog_df should include all availible data and should therefore not be split into a validation set (test set should still be separate).
+    NOTE: Valid size is expected to be an int, representing the number of validation predictions. Therefore valid_size>=horizon.
+
+    Parameters:
+    -----------
+    model_cls: the class fingerprint of the darts model.
+
+    model_name: Name of the model (used for saving the best weights for early stopping)
+
+    model_search_space: a dictionary, where the key is a string of a models key word argument, which needs to be optimized. The values are the Optuna reccomendations.
+
+    invariates_kwargs: a dictionary containing other model parameters which do NOT need to be optimized.
+
+    target_series: Pandas series containing the target Time series NOTE: this includes the validation data and should therefore not be splitted.
+
+    exog_df: Pandas Dataframe containing the exogenous variables.
+
+    valid_size: an int representing the number of validation predictions to use. NOTE: Valid size is expected to be an int, representing the number of validation predictions.
+    Therefore valid_size>=horizon. It is also worth noting that it takes into account the input size of the model. Therfore there will be a partial overlap with the test set
+    with inputs, however the outputs are completely separate. This allows for minimal data wastage and still prervents data leakage.
+
+    horizon: the number of time steps into the future the model should optimize for.
+
+    n_trials: Number of optuna trials to perform (greater the number the better the results, but at the cost of time).
+
+    patience: The number of epochs to wait with no improvement of tol, before early stopping.
+
+    tol: the minimum increase in performance which each epoch requires otherwise early stopping occurs (see also patience).
+
+    verbose: Used to print the final results.
+
+    Returns:
+    --------
+    The optimized hyper parameters as a dict.
+    NOTE: this does not include the invariates_kwargs.
+    '''
+
+    
+    if valid_size<horizon:
+        raise Exception("valid_size should be at least as big as horizon.")
+
+
+    def objective(trial):
+        """Objective function for Optuna hyperparameter tuning."""
+
+        #Get the suggested optuna parameters
+        model_kwargs = optuna_trial_get_kwargs(trial, search_space=model_search_space)
+
+        # darts allows probabilistic/deterministic variants (likelihood=(...),loss_fn= None for probabilistic)
+        if 'loss_fn' in model_kwargs.keys():
+            if model_kwargs['loss_fn']== 'QuantileRegression':
+                model_kwargs['loss_fn']= None
+                model_kwargs['likelihood']=QuantileRegression((0.25,0.5,0.75))
+            else:
+                model_kwargs['likelihood']=None
+                model_kwargs['loss_fn']= nn.MSELoss()
+
+        # Define compulsory parameters for optimization
+        model_kwargs["save_checkpoints"]=True
+        model_kwargs["model_name"]=model_name
+        model_kwargs["force_reset"]=True
+        model_kwargs["n_epochs"]=10000
+        model_kwargs["random_state"]=42
+
+        model_kwargs.update(invariates_kwargs)
+
+        # Split into training and validation set:
+        train_target, valid_target, train_exog, valid_exog = train_valid_split_darts(exog_df,target_series,valid_size,model_kwargs["input_chunk_length"])
+
+        # Instantiate scalers and scale
+        target_scaler = Scaler()
+        exog_scaler = Scaler()
+
+        train_target_scaled = target_scaler.fit_transform(train_target)
+        train_exog_scaled = exog_scaler.fit_transform(train_exog)
+
+        valid_target_scaled = target_scaler.transform(valid_target)
+        valid_exog_scaled = exog_scaler.transform(valid_exog)
+
+        # Other compulsory model parameters:
+        early_stopper = EarlyStopping(
+            monitor="val_loss",
+            patience=patience,
+            min_delta=tol,
+            mode="min",
+            verbose=True
+            )
+        
+        model_kwargs["pl_trainer_kwargs"]={
+            "accelerator":"gpu",
+            "devices": -1,
+            "callbacks": [early_stopper]
+        }
+        
+        # define the model:
+        model=model_cls(**model_kwargs)
+
+        #Train:
+        model.fit(
+            series=train_target_scaled,
+            past_covariates=train_exog_scaled,
+            val_series=valid_target_scaled,
+            val_past_covariates=valid_exog_scaled,
+            verbose=False,
+        )
+
+        # Load the best weights from early stopping:
+        model.load_from_checkpoint(model_name=model_name,best=True)
+
+        # Validate the model:
+        rmses=np.array([])# stores the rmse of each validation sample
+        # Loop over relevent validation samples (taking into account the horizon): 
+        for i in range(target_series.shape[0]-valid_size, target_series.shape[0]-horizon +1):
+            #Load the inputs and outputs
+            x,y=load_prediction(model_kwargs["input_chunk_length"],exog_df,target_series,exog_scaler,target_scaler,target_series.index[i])
+            
+            # If the model is probabilistic, take 500 samples and average them
+            if model_kwargs['loss_fn']== None:
+            
+                pred=target_scaler.inverse_transform(model.predict(n=horizon,series=y,past_covariates=x,verbose=False, num_samples=500)).values().flatten()
+
+            else:
+                pred=target_scaler.inverse_transform(model.predict(n=horizon,series=y,past_covariates=x,verbose=False)).values().flatten()
+            
+            ground_truth=target_series.loc[target_series.index[i]:target_series.index[i+ horizon -1]].to_numpy()
+
+            #claculate rmse for prediction:
+            rmses=np.append(rmses,root_mean_squared_error(ground_truth,pred))
+        
+        #Macro-average rmse of predictions:
+        return np.mean(rmses)
+
+    # Define optuna study and optimize
+    study = optuna.create_study(
+                direction="minimize",
+                study_name=f"{model_name}_hyperparameter_optimisation")
+    
+    study.optimize(objective, n_trials=n_trials,show_progress_bar =True)
+
+    #restore best params
+    best_params = study.best_params
+    
+    if verbose:
+         print(f"Best hyperparameters found:\n{best_params}")
+    
+    return best_params
+
+def save_model_hyper_params(file_name:str,params:dict):
+    '''
+    This saves the models best hyper parameters:
+
+    '''
+    with open(file_name,'w') as f:
+        json.dump(params,f)
+
+def darts_predict(model:object, train_df:pd.DataFrame, test_df:pd):
+
+    pass
