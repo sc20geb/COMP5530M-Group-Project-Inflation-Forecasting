@@ -22,7 +22,7 @@ from typing import Dict, Any, Optional
 import numpy as np
 import optuna
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import root_mean_squared_error
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestRegressor
 
@@ -101,7 +101,7 @@ def tune_rf(
                 pred = pipeline.predict(X.iloc[val_idx])
                 if not np.all(np.isfinite(pred)):
                     raise ValueError("non‑finite predictions")
-                rmse = mean_squared_error(y.iloc[val_idx], pred, squared=False)
+                rmse = root_mean_squared_error(y.iloc[val_idx], pred)
             except Exception:
                 # any failure → penalise trial
                 return float("inf")
