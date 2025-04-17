@@ -267,87 +267,117 @@ def loss_curve(trainLoss: list, validLoss: list, title: str = None):
     plt.grid(True)
     plt.show()
 
+
+import torch
+import torch.nn as nn
+import optuna
+import torch.optim as optim
+from Models.GRU import GRUModel  # Assuming GRUModel is defined in Models/GRU.py
+
 def optuna_tune_and_train(
-    model_class,  # Any model class (GRU, LSTM, Transformer, etc.)
+    model_class,  # Model class (e.g., GRUModel)
     train_loader,
     val_loader,
     device,
-    max_epochs=50,
-    model_save_path="models",
-    model_name="Model",
-    use_best_hyperparams=False,  # Set False to force a fresh Optuna run
-    n_trials=20,  # Number of Optuna trials
-    verbose=False  # Whether or not to print out progress
+    input_size,  # The number of features in the dataset
+    max_epochs=50,  # Maximum number of epochs for training
+    model_save_path="models",  # Path to save the trained models
+    model_name="Model",  # The name of the model for saving
+    use_best_hyperparams=False,  # Whether to use the best hyperparameters found
+    n_trials=20,  # Number of trials for Optuna
+    verbose=False  # Whether to print progress during training
 ):
     """
-    Runs Optuna hyperparameter tuning and trains the model with the best parameters.
+    Performs hyperparameter optimization using Optuna, trains the model with the best parameters, 
+    and saves the best model to the specified path.
     """
 
-    # Step 1: Run Optuna Hyperparameter Tuning
-    study = optuna.create_study(direction="minimize", study_name=f"{model_name if model_name != 'Model' else model_class.__name__}_hyperparameter_optimisation")
-
+    # Optuna's objective function to optimize hyperparameters
     def objective(trial):
-        """Objective function for Optuna hyperparameter tuning."""
-        hidden_size = trial.suggest_int("hidden_size", *OPTUNA_SEARCH_SPACE["hidden_size"])
-        num_layers = trial.suggest_int("num_layers", *OPTUNA_SEARCH_SPACE["num_layers"])
-        learning_rate = trial.suggest_float("lr", *OPTUNA_SEARCH_SPACE["lr"], log=True)
+        hidden_size = trial.suggest_int("hidden_size", 64, 256)
+        num_layers = trial.suggest_int("num_layers", 1, 3)
+        dropout = trial.suggest_float("dropout", 0.1, 0.5)
+        lr = trial.suggest_float("lr", 1e-5, 1e-2, log=True)
+        weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-2, log=True)
 
-        # Initialize model
-        model = model_class(input_size=1, hidden_size=hidden_size, num_layers=num_layers, output_size=1).to(device)
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+        # Initialize the model with the trial's hyperparameters
+        model = model_class(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            dropout=dropout,
+            output_size=1
+        ).to(device)
+
+        optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
         criterion = nn.MSELoss()
 
-        # Train for a few epochs to evaluate performance
-        num_epochs = 10  # Shorter tuning period
-        total_loss = 0
-        model.train()
-        
-        for epoch in range(num_epochs):
-            # Use extant function to train for one epoch, reporting back the average loss on each item
-            avg_loss = train_epoch(model, train_loader, criterion, optimizer, device)
+        best_val_loss = float("inf")
+        patience = 5
+        patience_counter = 0
 
-            trial.report(avg_loss, epoch)
+        # Train and validate the model for a few epochs
+        for epoch in range(max_epochs):
+            train_loss = train_epoch(model, train_loader, criterion, optimizer, device)
+            val_loss = validate_logits(model, val_loader, criterion, device)
 
-            # Handle pruning (early stopping within Optuna)
-            if trial.should_prune():
-                raise optuna.exceptions.TrialPruned()
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                patience_counter = 0
+            else:
+                patience_counter += 1
+                if patience_counter >= patience:
+                    print(f" Early stopping at epoch {epoch}")
+                    break
 
-        return avg_loss
+            if verbose:
+                print(f"Epoch {epoch + 1}/{max_epochs} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
 
-    # Run Optuna trials
-    if verbose: print(" Running Optuna hyperparameter tuning...")
+        return best_val_loss
+
+    # Create an Optuna study for hyperparameter optimization
+    study = optuna.create_study(direction="minimize")
     study.optimize(objective, n_trials=n_trials)
 
-    # Get Best Hyperparameters
+    # Get the best hyperparameters from the study
     best_params = study.best_params
-    if verbose: print(f" Best hyperparameters found: {best_params}")
+    print("Best hyperparameters:", best_params)
 
-    # Step 2: Train Model with Best Hyperparameters
-    model = model_class(
-        input_size=1,
+    # Build the final model with the best hyperparameters
+    best_model = model_class(
+        input_size=input_size,
         hidden_size=best_params["hidden_size"],
         num_layers=best_params["num_layers"],
+        dropout=best_params.get("dropout", 0.0),
         output_size=1
     ).to(device)
 
-    optimizer = optim.Adam(model.parameters(), lr=best_params["lr"])
-    lossFn = nn.MSELoss()
+    optimizer = optim.Adam(best_model.parameters(), lr=best_params["lr"], weight_decay=best_params["weight_decay"])
+    criterion = nn.MSELoss()
 
-    metadata = train_model(
-        model=model,
-        maxEpochs=max_epochs,
-        modelSavePath=model_save_path,
-        modelName=model_name,
-        dataLoaderTrain=train_loader,
-        dataLoaderValid=val_loader,
-        lossFn=lossFn,
-        optimizer=optimizer,
-        device=device,
-        verbose=True
-    )
+    # Final training loop with the best hyperparameters
+    best_val_loss = float("inf")
+    patience = 5
+    patience_counter = 0
+    for epoch in range(max_epochs):
+        train_loss = train_epoch(best_model, train_loader, criterion, optimizer, device)
+        val_loss = validate_logits(best_model, val_loader, criterion, device)
 
-    # Save Final Model
-    torch.save(model.state_dict(), os.path.join(model_save_path, f'{model_name}.pth'))
-    if verbose: print(" Model training complete and saved!")
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            patience_counter = 0
+            # Save the best model
+            torch.save(best_model.state_dict(), os.path.join(model_save_path, f"{model_name}_best.pt"))
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print(f" Early stopping at epoch {epoch}")
+                break
 
-    return model, metadata
+        if verbose:
+            print(f"Epoch {epoch + 1}/{max_epochs} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
+
+    # Load the best model (the one with the lowest validation loss)
+    best_model.load_state_dict(torch.load(os.path.join(model_save_path, f"{model_name}_best.pt")))
+
+    return best_model, best_params

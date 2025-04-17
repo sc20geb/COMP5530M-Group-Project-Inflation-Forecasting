@@ -82,7 +82,9 @@ def add_lagged_features(df : pd.DataFrame, target_cols : list[str] , lags : list
         The original DataFrame with additional lagged feature columns.
     """
     lagged_data = {f"{t_col}_lag{lag}": df[t_col].shift(lag) for t_col in target_cols for lag in lags}
-    return df.assign(**lagged_data)
+    df = df.assign(**lagged_data)
+    logging.info(f"Added lagged features with lags {lags} to target columns {target_cols}. DataFrame shape: {df.shape}")
+    return df
 
 def add_rolling_features(df : pd.DataFrame, target_col : str, windows : list[int] = [3, 6, 12]):
     '''
@@ -108,6 +110,8 @@ def add_rolling_features(df : pd.DataFrame, target_col : str, windows : list[int
     for window in windows:
         df[f"{target_col}_rolling_mean{window}"] = df[target_col].rolling(window=window).mean()
         df[f"{target_col}_rolling_std{window}"] = df[target_col].rolling(window=window).std()
+
+    logging.info(f"Added rolling mean and standard deviation features to target column {target_col}. DataFrame shape: {df.shape}")
     return df
 
 def add_time_features(df : pd.DataFrame, date_col : str = 'observation_date'):
@@ -527,7 +531,7 @@ def add_dimension(arr : np.array):
     Numpy array with added dimension
     '''
     return arr.reshape(*arr.shape, 1)
-
+ 
 # Random Forest builder func
 def build_feature_matrix(
     df: pd.DataFrame,
@@ -562,3 +566,41 @@ def build_feature_matrix(
         df = df.dropna(subset=feature_cols + [target_col]).reset_index(drop=True)
 
     return df[feature_cols], df[target_col]
+
+def inverse_transform_target_features(scaler, data, target_features):
+    '''
+    Inverse transforms using a scaler fitted to a set of features that is a superset of the list of target features in the data provided.
+
+    Parameters:
+    -----------
+    scaler: sklearn scaler. The scaler which has been fitted to more features than are available in 'data'.
+    data: numpy array. Data to inverse transform, with fewer columns than the scaler was fitted on.
+    target_features: list of strings. The names of the features to be inverse transformed; must match the names of the features on which the scaler was trained.
+
+    Returns:
+    --------
+    Numpy array containing the data inverse transformed using the appropriate features of the scaler.
+    '''
+
+    # Identify the features in the scaler and the indices in the scaler corresponding to the target features
+    scaler_features = scaler.get_feature_names_out()
+    target_indices = [scaler_features[i] in target_features for i in range(len(scaler_features))]
+
+    # Checks
+    if len(target_features) == 0: raise ValueError('There must be at least one target feature.')
+    if sum(target_indices) != len(target_features): raise ValueError(f'Scaler was fitted to {len(scaler_features)} when {len(target_features)} target features were provided.')
+
+    data = data.reshape(-1, len(target_features))
+
+    # Build the input to the scaler (i.e. numbers on relevant columns, but zeroes everywhere else)
+    scaler_input = np.array(data[:, 0])
+    target_col = 1
+    for i in range(1, len(scaler_features)):
+        if scaler_features[i] in target_features: 
+            cur_col = data[:, target_col]
+            target_col += 1
+        else: cur_col = np.zeros((len(data), 1))
+        scaler_input = np.column_stack((scaler_input, cur_col))
+
+    # Inverse transform using input data, and select only relevant indices
+    return scaler.inverse_transform(scaler_input)[:, target_indices]
