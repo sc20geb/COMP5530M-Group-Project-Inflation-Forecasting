@@ -12,11 +12,14 @@ from darts import TimeSeries
 from darts.dataprocessing.transformers import Scaler
 import pytorch_lightning
 from darts.utils.likelihood_models import QuantileRegression
+from darts.metrics import mse
 import pandas as pd
 import json
 
+import sys
+sys.path.append(os.path.join('..', '..'))  #ensures imports can be performed from anywhere in the repository
+
 from Training.Helper.EarlyStopping import EarlyStopping  #added prefix so import was recognised
-from darts.metrics import mse
 
 # Max depth of recursive calls that should be restricted below the default recursion limit
 MAX_DEPTH = 10
@@ -403,13 +406,6 @@ def optuna_tune_and_train_pytorch(
     --------
     Best-parameter trained model, training metadata, (optional) Optuna study performed.
     """
-
-    # Step 1: Run Optuna Hyperparameter Tuning
-    study = optuna.create_study(direction="minimize",
-                                # Uses successive halving several times at different levels of pruning aggressiveness depending on whether validation performance of configurations are distinguishable after a given number of runs (per-config resource allocation)
-                                pruner=optuna.pruners.HyperbandPruner(),
-                                study_name=f"{model_name if model_name else model_class.__name__}_hyperparameter_optimisation")
-
     def obj(trial):
         """Objective function for Optuna hyperparameter tuning."""
 
@@ -439,22 +435,15 @@ def optuna_tune_and_train_pytorch(
                 raise optuna.exceptions.TrialPruned()
 
         return valid_loss
-
-    # Run Optuna trials
-    if verbose: print("Running Optuna hyperparameter tuning...")
-    if objective: obj = objective
-    study.optimize(obj, n_trials=n_trials)
-
-    # Get the best hyperparameters from the study
-    best_params = study.best_params
-    if verbose: print(f"Best hyperparameters found: {best_params}")
+    
+    if return_study: best_params, study = optuna_tune(obj, model_name, n_trials, verbose, return_study=return_study)
+    else: best_params = optuna_tune(obj, model_name, n_trials, verbose, return_study=return_study)
 
     # Split the best parameters found by the trial into the model's and the optimiser's
     if has_optimiser: model_best_params, optimiser_best_params = split_params(best_params, model_search_space, optim_search_space)
     else: model_best_params = best_params
 
     # Build the final model with the best hyperparameters
-    #TODO: Ensure has_optimiser stuff works - i.e. compatability with DARTS models
     best_model = model_class(**model_invariates, **model_best_params).to(device)
 
     if has_optimiser: optimizer = optim.Adam(best_model.parameters(), **optimiser_best_params)
@@ -540,12 +529,41 @@ def train_valid_split_darts(exog_df:pd.DataFrame, target_series:pd.Series, valid
 
     return train_target, valid_target, train_exog, valid_exog
 
+def optuna_tune(objective, model_name : str, n_trials : int, verbose : bool, return_study : bool = False):
+    '''
+    General Optuna objective function optimisation framework.
+
+    Parameters:
+    -----------
+    objective: Optuna objective function to be optimised (takes a single trial as argument).
+    model_name: The name of the model being optimised; used to name the optuna study.
+    n_trials: The number of Optuna trials to perform.
+    verbose: Whether to display intermediate progress of trials/ final best hyperparameters.
+    return_study: Whether or not to return the Optuna study performed.
+
+    Returns:
+    --------
+    Dictionary of optimal parameters found, (optional) Optuna study performed
+    '''
+    
+    # Define optuna study and optimize
+    study = optuna.create_study(direction="minimize", pruner=optuna.pruners.HyperbandPruner(), study_name=f"{model_name}_hyperparameter_optimisation")
+    
+    # Optimise the objective provided using the study created
+    # NOTE: Assumes that the arguments for 'objective' are already defined in the calling function
+    if verbose: print("Running Optuna hyperparameter tuning...")
+    study.optimize(objective, n_trials=n_trials, show_progress_bar=verbose)
+
+    # Get and return the best parameters
+    best_params = study.best_params
+    if verbose: print(f"Best hyperparameters found:\n{best_params}")
+    if return_study: return best_params, study
+    return best_params
 
 def darts_optuna(model_cls:object,model_name:str,model_search_space:dict,
                   invariates_kwargs:dict, target_series:pd.Series,
                   exog_df:pd.DataFrame,valid_size:int,horizon:int,
-                  n_trials:int=100,patience:int=5,tol:float=1e-5,verbose:bool=True):
-
+                  n_trials:int=100, n_epochs:int=10000, patience:int=5,tol:float=1e-5,verbose:bool=True):
     '''
     Finds opptimal hyper-parameters for a given model class (model_cls) and a search space (model_search_space).
     NOTE: target_series and exog_df should include all availible data and should therefore not be split into a validation set (test set should still be separate).
@@ -573,6 +591,8 @@ def darts_optuna(model_cls:object,model_name:str,model_search_space:dict,
 
     n_trials: Number of optuna trials to perform (greater the number the better the results, but at the cost of time).
 
+    n_epochs: Maximum number of epochs the model should fit for (usually early stopping stops before this).
+
     patience: The number of epochs to wait with no improvement of tol, before early stopping.
 
     tol: the minimum increase in performance which each epoch requires otherwise early stopping occurs (see also patience).
@@ -584,14 +604,12 @@ def darts_optuna(model_cls:object,model_name:str,model_search_space:dict,
     The optimized hyper parameters as a dict.
     NOTE: this does not include the invariates_kwargs.
     '''
-
     
     if valid_size<horizon:
         raise Exception("valid_size should be at least as big as horizon.")
-
-
+    
     def objective(trial):
-        """Objective function for Optuna hyperparameter tuning."""
+        """Objective function for darts models hyperparameter tuning."""
 
         #Get the suggested optuna parameters
         model_kwargs = optuna_trial_get_kwargs(trial, search_space=model_search_space)
@@ -606,11 +624,11 @@ def darts_optuna(model_cls:object,model_name:str,model_search_space:dict,
                 model_kwargs['loss_fn']= nn.MSELoss()
 
         # Define compulsory parameters for optimization
-        model_kwargs["save_checkpoints"]=True
+        invariates_kwargs["save_checkpoints"]=True
+        invariates_kwargs["force_reset"]=True
+        invariates_kwargs["random_state"]=42
+        model_kwargs["n_epochs"]=n_epochs
         model_kwargs["model_name"]=model_name
-        model_kwargs["force_reset"]=True
-        model_kwargs["n_epochs"]=10000
-        model_kwargs["random_state"]=42
 
         model_kwargs.update(invariates_kwargs)
 
@@ -637,8 +655,7 @@ def darts_optuna(model_cls:object,model_name:str,model_search_space:dict,
             )
         
         model_kwargs["pl_trainer_kwargs"]={
-            "accelerator":"gpu",
-            "devices": -1,
+            "accelerator":'auto',
             "callbacks": [early_stopper]
         }
         
@@ -666,7 +683,6 @@ def darts_optuna(model_cls:object,model_name:str,model_search_space:dict,
             
             # If the model is probabilistic, take 500 samples and average them
             if model_kwargs['loss_fn']== None:
-            
                 pred=target_scaler.inverse_transform(model.predict(n=horizon,series=y,past_covariates=x,verbose=False, num_samples=500)).values().flatten()
 
             else:
@@ -679,21 +695,8 @@ def darts_optuna(model_cls:object,model_name:str,model_search_space:dict,
         
         #Macro-average rmse of predictions:
         return np.mean(rmses)
-
-    # Define optuna study and optimize
-    study = optuna.create_study(
-                direction="minimize",
-                study_name=f"{model_name}_hyperparameter_optimisation")
     
-    study.optimize(objective, n_trials=n_trials,show_progress_bar =True)
-
-    #restore best params
-    best_params = study.best_params
-    
-    if verbose:
-         print(f"Best hyperparameters found:\n{best_params}")
-    
-    return best_params
+    return optuna_tune(objective, model_name, n_trials, verbose)
 
 def save_model_hyper_params(file_name:str,params:dict):
     '''
@@ -791,8 +794,6 @@ def optuna_tune_and_train_darts(model_class,
     
     if return_study: return best_model, study
     return best_model
-
-
 
 def reformat_best_params(best_params : dict, formatting_dict : dict, cur_depth : int = 0):
     '''
