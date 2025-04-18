@@ -291,26 +291,62 @@ def calc_metrics_arrays(*prediction_arrays : np.ndarray, model_names : list[str]
     return calc_metrics(predictionsDf, **calc_metrics_kwargs)
 
 
-def error_plot(predsDf, model='all'):
+def error_plot(predsDf, model='all', absolute=False, title=None):
 
     ground_truth= predsDf['ground_truth'].to_numpy()
 
     plt.figure(figsize=(10, 5))
-    ax = plt.axes()
-    ax.xaxis.set_major_locator(plt.MaxNLocator(10))
-    plt.locator_params(axis='x', nbins=10)
+    plt.axhline(linewidth=2, color='black',alpha=0.7)
 
     if model == 'all':
         for model in predsDf.columns.drop('ground_truth'):
-            plt.plot(predsDf.index, predsDf[model].to_numpy()- ground_truth, marker='o')
-            plt.legend(predsDf.columns.drop('ground_truth'))
-            plt.title('Error plot:')
-    else:
-        plt.plot(predsDf.index, predsDf['model'].to_numpy()- ground_truth, marker='o')
-        plt.title(f'{model} error')
+            if absolute:
+                plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[model].to_numpy()- ground_truth), marker='o', label=model)
+            else:
+                plt.plot(np.arange(0,len(predsDf.index)), predsDf[model].to_numpy()- ground_truth, marker='o', label=model)
+            
+        plt.legend()
+
+    elif isinstance(model,list):
+        for i in model:
+            if absolute:
+                plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[i].to_numpy()- ground_truth), marker='o', label=i)
+            else:
+                plt.plot(np.arange(0,len(predsDf.index)), predsDf[i].to_numpy()- ground_truth, marker='o', label=i)
+            
+        plt.legend()
     
-    plt.axhline(linewidth=2, color='black')
+    else:
+        if absolute:
+            plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[model].to_numpy() - ground_truth), marker='o')
+        else:
+            plt.plot(np.arange(0,len(predsDf.index)), predsDf[model].to_numpy()- ground_truth, marker='o')
+        
+
+    if title is not None:
+        plt.title(title)
+    plt.xticks(np.arange(0,len(predsDf.index)),predsDf.index)
     plt.grid()
     plt.ylabel('Error')
     plt.xlabel('dates')
+    plt.show()
+
+def plot_metric(metricsDf,metric, title=None):
+
+    plt.bar(metricsDf.index, metricsDf[metric])
+
+    plt.xticks(range(0,metricsDf.shape[0]), metricsDf.index, rotation='vertical')
+
+    if title is not None:
+        plt.title(title)
+    
+    for i in range(0, metricsDf.shape[0]):
+        plt.text(i, metricsDf[metric].iloc[i] + 0.005, round(metricsDf[metric].iloc[i],4),ha='center')
+    
+
+    plt.ylim(0,np.max(metricsDf[metric]) + 0.05)
+
+    plt.ylabel(metric)
+    plt.xlabel('Model')
+
     plt.show()
