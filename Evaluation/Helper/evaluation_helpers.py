@@ -234,7 +234,7 @@ def get_predictions(predsPath:Path):
     
     return predsDf
 
-def calc_metrics(predictionsDf:pd.DataFrame, horizon = None, metrics={'RMSE': root_mean_squared_error, 
+def calc_metrics(predictionsDf:pd.DataFrame, metrics={'RMSE': root_mean_squared_error, 
                                                                       'MAE': mean_absolute_error,
                                                                       'r2': r2_score}):
     '''
@@ -257,9 +257,6 @@ def calc_metrics(predictionsDf:pd.DataFrame, horizon = None, metrics={'RMSE': ro
     --------
     Returns a pandas Dataframe containg all the evaluation metrics of all the models, where each column represents a metric and each row represents a model.
     '''
-    # Deafult to horizon of 2 years:
-    if horizon is None:
-        horizon= predictionsDf.shape[0]
 
     # create an empty dataframe with columns reprresnting an evaluation metric
     metricsDf= pd.DataFrame(columns=list(metrics.keys()))
@@ -268,7 +265,7 @@ def calc_metrics(predictionsDf:pd.DataFrame, horizon = None, metrics={'RMSE': ro
     for model in predictionsDf.columns.drop('ground_truth'):
         # Calculate the metrics and add them to the metrics dataframe
         for metric in metrics:
-            metricsDf.loc[model, metric] = metrics[metric](predictionsDf['ground_truth'].iloc[:horizon], predictionsDf[model].iloc[:horizon])
+            metricsDf.loc[model, metric] = metrics[metric](predictionsDf['ground_truth'], predictionsDf[model])
 
     return metricsDf
 
@@ -292,3 +289,28 @@ def calc_metrics_arrays(*prediction_arrays : np.ndarray, model_names : list[str]
     if model_names: predictionsDf.columns = ['ground_truth'] + model_names
     else: predictionsDf.columns = ['ground_truth'] + predictionsDf.columns[1:]
     return calc_metrics(predictionsDf, **calc_metrics_kwargs)
+
+
+def error_plot(predsDf, model='all'):
+
+    ground_truth= predsDf['ground_truth'].to_numpy()
+
+    plt.figure(figsize=(10, 5))
+    ax = plt.axes()
+    ax.xaxis.set_major_locator(plt.MaxNLocator(10))
+    plt.locator_params(axis='x', nbins=10)
+
+    if model == 'all':
+        for model in predsDf.columns.drop('ground_truth'):
+            plt.plot(predsDf.index, predsDf[model].to_numpy()- ground_truth, marker='o')
+            plt.legend(predsDf.columns.drop('ground_truth'))
+            plt.title('Error plot:')
+    else:
+        plt.plot(predsDf.index, predsDf['model'].to_numpy()- ground_truth, marker='o')
+        plt.title(f'{model} error')
+    
+    plt.axhline(linewidth=2, color='black')
+    plt.grid()
+    plt.ylabel('Error')
+    plt.xlabel('dates')
+    plt.show()
