@@ -291,15 +291,35 @@ def calc_metrics_arrays(*prediction_arrays : np.ndarray, model_names : list[str]
     return calc_metrics(predictionsDf, **calc_metrics_kwargs)
 
 
-def error_plot(predsDf, model='all', absolute=False, title=None):
+def error_plot(predsDf:pd.DataFrame, model:str|list='all', absolute:bool=False, title:str=None):
+    '''
+    Given a predictions Dataframe, plot the error of the predictions.
 
+    Parameters:
+    -----------
+    predsDf: Pandas dataframe with prtedictions.
+
+    model: "all" to print all models, a list of strings to print specified models, or a string to specify which model to plot.
+
+    absolute: Wheter to plot the absolute error (Can be easier to interpret, but loses information about over/under predicting).
+
+    title: optinonal title to the plot.
+
+    Returns:
+    --------
+    Void.
+    '''
     ground_truth= predsDf['ground_truth'].to_numpy()
 
     plt.figure(figsize=(10, 5))
+
+    # make the x -axis bold (represents the ground truth):
     plt.axhline(linewidth=2, color='black',alpha=0.7)
 
+    # Plot all models:
     if model == 'all':
         for model in predsDf.columns.drop('ground_truth'):
+            # Take absolute val if specified:
             if absolute:
                 plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[model].to_numpy()- ground_truth), marker='o', label=model)
             else:
@@ -307,8 +327,10 @@ def error_plot(predsDf, model='all', absolute=False, title=None):
             
         plt.legend()
 
+    # Plot a list of specified models:
     elif isinstance(model,list):
         for i in model:
+            # Take absolute val if specified:
             if absolute:
                 plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[i].to_numpy()- ground_truth), marker='o', label=i)
             else:
@@ -316,37 +338,60 @@ def error_plot(predsDf, model='all', absolute=False, title=None):
             
         plt.legend()
     
+    # Plot a single model:
     else:
+        # Take absolute val if specified:
         if absolute:
             plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[model].to_numpy() - ground_truth), marker='o')
         else:
             plt.plot(np.arange(0,len(predsDf.index)), predsDf[model].to_numpy()- ground_truth, marker='o')
         
-
+    # Add optional title:
     if title is not None:
         plt.title(title)
+
+    # change xticks to dates:
     plt.xticks(np.arange(0,len(predsDf.index)),predsDf.index)
+
     plt.grid()
     plt.ylabel('Error')
     plt.xlabel('dates')
     plt.show()
 
-def plot_metric(metricsDf,metric, title=None):
+def plot_metric(metricsDf:pd.DataFrame,metric:str, title=None):
 
+    '''
+    Plots a bar chart of a metric for all models.
+
+    Parameters:
+    -----------
+    metricsDf: A dataframe with metrics as columns and models as index.
+
+    metric: str represting a metric (column of metricsDf).
+
+    title: str for an optional title.
+
+    Returns:
+    --------
+    Void.
+    '''
+    # plot the values
     plt.bar(metricsDf.index, metricsDf[metric])
 
+    # Change orientaion of bar x ticks
     plt.xticks(range(0,metricsDf.shape[0]), metricsDf.index, rotation='vertical')
 
+    # plot optional title
     if title is not None:
         plt.title(title)
     
+    # display height values above each bar
     for i in range(0, metricsDf.shape[0]):
         plt.text(i, metricsDf[metric].iloc[i] + 0.005, round(metricsDf[metric].iloc[i],4),ha='center')
     
-
+    # Change the upperlimit of the graph (stop the bar values being cut-off)
     plt.ylim(0,np.max(metricsDf[metric]) + 0.05)
 
     plt.ylabel(metric)
     plt.xlabel('Model')
-
     plt.show()
