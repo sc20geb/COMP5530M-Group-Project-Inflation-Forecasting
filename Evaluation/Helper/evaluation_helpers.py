@@ -358,7 +358,7 @@ def error_plot(predsDf:pd.DataFrame, model:str|list='all', absolute:bool=False, 
     plt.xlabel('dates')
     plt.show()
 
-def plot_metric(metricsDf:pd.DataFrame,metric:str, title=None):
+def plot_metric(metricsDf:pd.DataFrame,metric:str,model='all', title=None):
 
     '''
     Plots a bar chart of a metric for all models.
@@ -375,22 +375,30 @@ def plot_metric(metricsDf:pd.DataFrame,metric:str, title=None):
     --------
     Void.
     '''
-    # plot the values
-    plt.bar(metricsDf.index, metricsDf[metric])
+    metricsDf_cpy= metricsDf.copy()
 
-    # Change orientaion of bar x ticks
-    plt.xticks(range(0,metricsDf.shape[0]), metricsDf.index, rotation='vertical')
+    if metric=='r2':
+        metricsDf_cpy["r2"]= metricsDf_cpy["r2"].map(lambda x: x if x>=0 else 0)
+
+    # plot the values
+    if model == 'all':
+        plt.bar(metricsDf_cpy.index, metricsDf_cpy[metric])
+        plt.xticks(range(0,metricsDf_cpy.shape[0]), metricsDf_cpy.index, rotation='vertical')
+        for i in range(0,metricsDf_cpy.shape[0]):
+            plt.text(i, metricsDf_cpy[metric].iloc[i] + 0.05, round(metricsDf_cpy[metric].iloc[i],4),ha='center')
+    elif isinstance(model,list):
+        plt.bar(model, metricsDf_cpy.loc[model,metric])
+        plt.xticks(range(0,len(model)), model, rotation='vertical')
+        for i in range(0, len(model)):
+            plt.text(i, metricsDf_cpy.loc[metricsDf_cpy.index[i],metric] + 0.05, round(metricsDf_cpy.loc[metricsDf_cpy.index[i],metric],4),ha='center')
+    
 
     # plot optional title
     if title is not None:
         plt.title(title)
     
-    # display height values above each bar
-    for i in range(0, metricsDf.shape[0]):
-        plt.text(i, metricsDf[metric].iloc[i] + 0.005, round(metricsDf[metric].iloc[i],4),ha='center')
-    
     # Change the upperlimit of the graph (stop the bar values being cut-off)
-    plt.ylim(0,np.max(metricsDf[metric]) + 0.05)
+    plt.ylim(0,np.max(metricsDf_cpy[metric]) + 0.5)
 
     plt.ylabel(metric)
     plt.xlabel('Model')
