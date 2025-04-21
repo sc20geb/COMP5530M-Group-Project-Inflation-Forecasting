@@ -1,0 +1,1 @@
+{"input_chunk_length": 27, "lstm_layers": 21, "num_attention_heads": 3, "hidden_size": 14, "dropout": 0.0, "lr": 0.0024491763687249776, "loss_fn": "MSE"}
