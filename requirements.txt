@@ -3,7 +3,7 @@ numpy
 pandas==2.2.3
 protobuf==5.29.3
 scikit_learn==1.6.1
-torch==2.6.0
+torch>=2.6.0
 tqdm==4.66.4
 statsmodels
 pytorch-forecasting==1.3.0
@@ -15,4 +15,3 @@ xlrd==2.0.1
 pmdarima
 openpyxl
 darts==0.34.0
-optuna

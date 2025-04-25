@@ -1,0 +1,1 @@
+{"input_chunk_length": 31, "lstm_layers": 15, "num_attention_heads": 4, "hidden_size": 27, "dropout": 0.0, "lr": 0.0005858788415566064, "loss_fn": "QuantileRegression"}

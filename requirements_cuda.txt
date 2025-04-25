@@ -1,0 +1,19 @@
+# Ensure this matches the latest CUDA platform supported by your GPU and the latest torch version that supports your Python environment (see https://pytorch.org/get-started/locally/)
+torch --index-url https://download.pytorch.org/whl/cu126
+# Latest numpy version not yet compatible with pandas - TODO: Change this when possible
+numpy==2.2.0
+matplotlib
+pandas
+protobuf
+scikit_learn
+tqdm
+statsmodels
+pytorch-forecasting
+jupyter
+seaborn
+pykalman
+optuna
+xlrd
+pmdarima
+openpyxl
+darts
