@@ -174,6 +174,7 @@ def add_modified_feature(df : pd.DataFrame , target_col : str, func : Callable[[
     df[f"{func.__name__}_{target_col}"] = func(df[target_col])
     return df
 
+
 def create_sequences(data : np.array, target : np.array, seq_len : int, exog : np.array = None, 
                      fft_real : np.array = None, fft_imag : np.array = None, config : dict = {'use_fft': False, 'use_exog': False}):
     """
@@ -216,13 +217,76 @@ def create_sequences(data : np.array, target : np.array, seq_len : int, exog : n
             X_exog.append(exog[i])
 
         X.append(seq_data)
-        y.append(target[i + seq_len])
+        y.append(target[i])
 
     if config.get("use_exog", False):
         return np.array(X), np.array(X_exog), np.array(y)
     else:
         return np.array(X), np.array(y)
+    
+def create_sequences_with_horizon(data, target, seq_len, horizon=1, config=None, **kwargs):
+    """
+    Creates input/output sequences with support for multi-horizon forecasting.
+    Parameters:
+    - data: np.array of features (N, features)
+    - target: np.array of targets (N,)
+    - seq_len: int, input sequence length
+    - horizon: int, number of steps to predict
+    - config: dict with optional 'use_fft', 'use_exog'
+    - kwargs: optional fft_real, fft_imag, exog
+    Returns:
+    - X: (num_samples, seq_len, num_features)
+    - y: (num_samples, horizon)
+    """
+    config = config or {}
+    X, y = [], []
 
+    for i in range(len(data) - seq_len - horizon + 1):
+        X.append(data[i:i+seq_len])
+        y.append(target[i+seq_len:i+seq_len+horizon])  # grab a sequence of horizon targets
+
+    return np.array(X), np.array(y)
+
+def make_predictions(model, X_val, y_val, scaler, feature_cols, device):
+    """
+    Makes predictions using the provided model and inverse transforms the results to the original scale.
+
+    Parameters:
+    - model: PyTorch model to make predictions
+    - X_val: np.array, validation input data (N, seq_len, num_features)
+    - y_val: np.array, true target values for the validation set (N, horizon)
+    - scaler: Scaler object used to inverse transform the predictions and targets
+    - feature_cols: list of feature column names (used to ensure proper inverse transformation)
+    - device: torch.device (device to run the model on)
+
+    Returns:
+    - y_val_original: np.array, true target values inverse transformed to the original scale
+    - y_pred_original: np.array, predicted values inverse transformed to the original scale
+    """
+        
+    with torch.no_grad():
+        y_pred = model(torch.tensor(X_val).float().to(device)).cpu().numpy()  # shape: [N, H]
+
+    # Inverse transform requires same number of columns as original feature space
+    def inverse_transform_target(data):
+        if data.ndim == 1:
+            data = data.reshape(-1, 1)
+
+        # Handle multi-output (horizon > 1)
+        if data.shape[1] > 1:
+            result = []
+            for i in range(data.shape[1]):
+                padded = np.hstack([data[:, i:i+1], np.zeros((len(data), len(feature_cols)-1))])
+                result.append(scaler.inverse_transform(padded)[:, 0])
+            return np.stack(result, axis=1)
+        else:
+            padded = np.hstack([data, np.zeros((len(data), len(feature_cols)-1))])
+            return scaler.inverse_transform(padded)[:, 0]
+
+    y_val_original = inverse_transform_target(y_val)
+    y_pred_original = inverse_transform_target(y_pred)
+
+    return y_val_original, y_pred_original
 
 def prepare_dataloader(X : np.array, y : np.array, X_exog : np.array = None, shuffle : bool = True, batch_size : int = 32):
     """

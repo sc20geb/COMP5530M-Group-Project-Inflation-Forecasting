@@ -205,34 +205,79 @@ def get_model_name(fileName:str):
 
     return fileName.split('_')[0].split('.')[0]
 
+# def get_predictions(predsPath:Path):
+#     '''
+#     This function combines all predictions of all models into one dataframe and includes the ground truth.
 
-def get_predictions(predsPath:Path):
-    '''
-    This function combines all predictions of all models into one dataframe and includes the ground truth.
+#     Parameters:
+#     -----------
+#     predsPath: A path/string of a path, to the directory of all the predictions
 
-    Parameters:
-    -----------
-    predsPath: A path/string of a path, to the directory of all the predictions
+#     Returns:
+#     --------
+#     Returns a pandas Dataframe of all the models predictions, as well as the ground truth. 
+#     '''
+#     # Get the ground truth:
+#     groundTruth= pd.read_csv(Path('../Data/Test/test1990s.csv'),parse_dates=[0],date_format='%m%Y',index_col=0, usecols=[0,1])
 
-    Returns:
-    --------
-    Returns a pandas Dataframe of all the models predictions, as well as the ground truth. 
-    '''
-    # Get the ground truth:
-    groundTruth= pd.read_csv(Path('../Data/Test/test1990s.csv'),parse_dates=[0],date_format='%m%Y',index_col=0, usecols=[0,1])
+#     # make an empty Dataframe to store the models predictions (making the index  the observation data):
+#     predsDf= pd.DataFrame(index=groundTruth.index)
 
-    # make an empty Dataframe to store the models predictions (making the index  the observation data):
-    predsDf= pd.DataFrame(index=groundTruth.index)
+#     # Add the ground truth to the predictions dataframe
+#     predsDf['ground_truth']= groundTruth
 
-    # Add the ground truth to the predictions dataframe
-    predsDf['ground_truth']= groundTruth
-
-    # Loop over all the files in the predictions folder:
-    for i in list(predsPath.glob('*.npy')):
-        # Add the predictions to the predictions dataframe, where the column is the model name
-        predsDf[get_model_name(i.name)]= np.load(i)[:12]
+#     # Loop over all the files in the predictions folder:
+#     for i in list(predsPath.glob('*.npy')):
+#         # Add the predictions to the predictions dataframe, where the column is the model name
+#         predsDf[get_model_name(i.name)]= np.load(i)[:12]
     
+#     return predsDf
+
+
+def get_predictions(predsPath: Path):
+    '''
+    Combines all predictions into one dataframe and includes the ground truth.
+
+    Automatically handles both 1D and 2D .npy files, and aligns prediction lengths
+    with ground truth. Handles cases where predictions have varying shapes.
+    '''
+    # Load ground truth
+    ground_truth = pd.read_csv(
+        Path('../Data/Test/test1990s.csv'),
+        parse_dates=[0],
+        date_format='%m%Y',
+        index_col=0,
+        usecols=[0, 1]
+    )
+
+    predsDf = pd.DataFrame(index=ground_truth.index)
+    predsDf['ground_truth'] = ground_truth.iloc[:, 0]  # Ensure it's 1D
+
+    # Loop through all .npy files in the prediction folder
+    for path in predsPath.glob("*.npy"):
+        model_name = get_model_name(path.name)
+        arr = np.load(path)
+
+        # Handle different shapes of the predictions array
+        if arr.ndim == 1:
+            preds = arr  # 1D array, no change needed
+        elif arr.ndim == 2 and arr.shape[1] == 2:
+            preds = arr[:, 1]  # 2D array with ground_truth and predictions, extract predictions
+        elif arr.ndim == 2 and arr.shape[1] > 1:
+            # Multi-horizon output (e.g., 77 x 6 for horizon 3), reshape as needed
+            preds = arr[:, -1]  # Or select whichever horizon you want (e.g., last column for horizon 3)
+        else:
+            print(f"Skipping {path.name} due to unexpected shape: {arr.shape}")
+            continue
+
+        # Match prediction length with ground truth (ensure alignment)
+        preds = preds[-len(predsDf):]
+
+        # Assign predictions
+        predsDf[model_name] = preds
+
     return predsDf
+
 
 def calc_metrics(predictionsDf:pd.DataFrame, metrics={'RMSE': root_mean_squared_error, 
                                                                       'MAE': mean_absolute_error,
