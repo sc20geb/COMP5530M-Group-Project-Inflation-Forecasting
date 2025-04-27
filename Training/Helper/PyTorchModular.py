@@ -23,6 +23,8 @@ from Training.Helper.EarlyStopping import EarlyStopping  #added prefix so import
 
 # Max depth of recursive calls that should be restricted below the default recursion limit
 MAX_DEPTH = 10
+# Horizons for which all models will be optimised
+HORIZONS = [1, 3, 6, 12]
 
 
 def train_epoch(
@@ -560,6 +562,24 @@ def optuna_tune(objective, model_name : str, n_trials : int, verbose : bool, ret
     if return_study: return best_params, study
     return best_params
 
+def fix_model_kwargs(model_kwargs, model_name, n_epochs, early_stopper):
+    model_kwargs["n_epochs"]=n_epochs
+    model_kwargs["model_name"]=model_name
+    # Darts allows probabilistic/deterministic variants (likelihood=(...),loss_fn= None for probabilistic)
+    if 'loss_fn' in model_kwargs.keys():
+        if model_kwargs['loss_fn']== 'QuantileRegression':
+            model_kwargs['loss_fn']= None
+            model_kwargs['likelihood']=QuantileRegression((0.25,0.5,0.75))
+        else:
+            model_kwargs['likelihood']=None
+            model_kwargs['loss_fn']= nn.MSELoss()
+    # Add the most generic trainer kwargs that work for everyone, including the passed early stopper
+    model_kwargs["pl_trainer_kwargs"]={
+            "accelerator":'auto',
+            "callbacks": [early_stopper]}
+    
+    return model_kwargs
+
 def darts_optuna(model_cls:object,model_name:str,model_search_space:dict,
                   invariates_kwargs:dict, target_series:pd.Series,
                   exog_df:pd.DataFrame,valid_size:int,horizon:int,
@@ -611,26 +631,24 @@ def darts_optuna(model_cls:object,model_name:str,model_search_space:dict,
     def objective(trial):
         """Objective function for darts models hyperparameter tuning."""
 
-        #Get the suggested optuna parameters
+        # Get the suggested optuna parameters
         model_kwargs = optuna_trial_get_kwargs(trial, search_space=model_search_space)
 
-        # darts allows probabilistic/deterministic variants (likelihood=(...),loss_fn= None for probabilistic)
-        if 'loss_fn' in model_kwargs.keys():
-            if model_kwargs['loss_fn']== 'QuantileRegression':
-                model_kwargs['loss_fn']= None
-                model_kwargs['likelihood']=QuantileRegression((0.25,0.5,0.75))
-            else:
-                model_kwargs['likelihood']=None
-                model_kwargs['loss_fn']= nn.MSELoss()
+        # Other compulsory model parameters:
+        early_stopper = pytorch_lightning.callbacks.early_stopping.EarlyStopping(
+            monitor="val_loss",
+            patience=patience,
+            min_delta=tol,
+            mode="min",
+            verbose=verbose
+        )
+
+        model_kwargs = fix_model_kwargs(model_kwargs, model_name, n_epochs, early_stopper)
 
         # Define compulsory parameters for optimization
         invariates_kwargs["save_checkpoints"]=True
         invariates_kwargs["force_reset"]=True
         invariates_kwargs["random_state"]=42
-        model_kwargs["n_epochs"]=n_epochs
-        model_kwargs["model_name"]=model_name
-
-        model_kwargs.update(invariates_kwargs)
 
         # Split into training and validation set:
         train_target, valid_target, train_exog, valid_exog = train_valid_split_darts(exog_df,target_series,valid_size,model_kwargs["input_chunk_length"])
@@ -643,32 +661,18 @@ def darts_optuna(model_cls:object,model_name:str,model_search_space:dict,
         train_exog_scaled = exog_scaler.fit_transform(train_exog)
 
         valid_target_scaled = target_scaler.transform(valid_target)
-        valid_exog_scaled = exog_scaler.transform(valid_exog)
-
-        # Other compulsory model parameters:
-        early_stopper = pytorch_lightning.callbacks.early_stopping.EarlyStopping(
-            monitor="val_loss",
-            patience=patience,
-            min_delta=tol,
-            mode="min",
-            verbose=True
-            )
+        valid_exog_scaled = exog_scaler.transform(valid_exog)        
         
-        model_kwargs["pl_trainer_kwargs"]={
-            "accelerator":'auto',
-            "callbacks": [early_stopper]
-        }
-        
-        # define the model:
-        model=model_cls(**model_kwargs)
+        # Define the model
+        model=model_cls(**model_kwargs, **invariates_kwargs)
 
-        #Train:
+        #Train the model
         model.fit(
             series=train_target_scaled,
             past_covariates=train_exog_scaled,
             val_series=valid_target_scaled,
             val_past_covariates=valid_exog_scaled,
-            verbose=False,
+            verbose=verbose,
         )
 
         # Load the best weights from early stopping:
