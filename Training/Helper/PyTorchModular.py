@@ -531,7 +531,8 @@ def train_valid_split_darts(exog_df:pd.DataFrame, target_series:pd.Series, valid
 
     return train_target, valid_target, train_exog, valid_exog
 
-def optuna_tune(objective, model_name : str, n_trials : int, verbose : bool, return_study : bool = False):
+def optuna_tune(objective, model_name : str, n_trials : int, verbose : bool, return_study : bool = False,
+                existing_trials : list[optuna.Trial] = [], existing_params : list[dict] = []):
     '''
     General Optuna objective function optimisation framework.
 
@@ -542,6 +543,8 @@ def optuna_tune(objective, model_name : str, n_trials : int, verbose : bool, ret
     n_trials: The number of Optuna trials to perform.
     verbose: Whether to display intermediate progress of trials/ final best hyperparameters.
     return_study: Whether or not to return the Optuna study performed.
+    existing_trials: Optional list of trials previously calculated with which to initialise optuna.
+    existing_params: Optional list of dictionaries representing existing parameters discovered by previous optuna run(s) with which optuna will be initialised.
 
     Returns:
     --------
@@ -550,6 +553,9 @@ def optuna_tune(objective, model_name : str, n_trials : int, verbose : bool, ret
     
     # Define optuna study and optimize
     study = optuna.create_study(direction="minimize", pruner=optuna.pruners.HyperbandPruner(), study_name=f"{model_name}_hyperparameter_optimisation")
+    if existing_trials: study.add_trials(existing_trials)
+    if existing_params:
+        for param in existing_params: study.enqueue_trial(param)
     
     # Optimise the objective provided using the study created
     # NOTE: Assumes that the arguments for 'objective' are already defined in the calling function
@@ -583,9 +589,11 @@ def fix_model_kwargs(model_kwargs, model_name, n_epochs, early_stopper):
 def darts_optuna(model_cls:object,model_name:str,model_search_space:dict,
                   invariates_kwargs:dict, target_series:pd.Series,
                   exog_df:pd.DataFrame,valid_size:int,horizon:int,
-                  n_trials:int=100, n_epochs:int=10000, patience:int=5,tol:float=1e-5,verbose:bool=True):
+                  n_trials:int=100, n_epochs:int=10000, patience:int=5, tol:float=1e-5,
+                  existing_trials:list[optuna.Trial]=[], existing_params:list[dict]=[],
+                  verbose:bool=True):
     '''
-    Finds opptimal hyper-parameters for a given model class (model_cls) and a search space (model_search_space).
+    Finds optimal hyper-parameters for a given model class (model_cls) and a search space (model_search_space).
     NOTE: target_series and exog_df should include all availible data and should therefore not be split into a validation set (test set should still be separate).
     NOTE: Valid size is expected to be an int, representing the number of validation predictions. Therefore valid_size>=horizon.
 
@@ -616,6 +624,10 @@ def darts_optuna(model_cls:object,model_name:str,model_search_space:dict,
     patience: The number of epochs to wait with no improvement of tol, before early stopping.
 
     tol: the minimum increase in performance which each epoch requires otherwise early stopping occurs (see also patience).
+
+    existing_trials: Optional list of trials previously calculated with which to initialise optuna.
+    
+    existing_params: Optional list of dictionaries representing existing parameters discovered by previous optuna run(s) with which optuna will be initialised.
 
     verbose: Used to print the final results.
 
@@ -700,15 +712,25 @@ def darts_optuna(model_cls:object,model_name:str,model_search_space:dict,
         #Macro-average rmse of predictions:
         return np.mean(rmses)
     
-    return optuna_tune(objective, model_name, n_trials, verbose)
+    return optuna_tune(objective, model_name, n_trials, verbose, existing_trials=existing_trials, existing_params=existing_params)
 
-def save_model_hyper_params(file_name:str,params:dict):
+def save_model_hyper_params(file_name:str, params:dict):
     '''
-    This saves the models best hyper parameters:
+    This saves the model's best hyper parameters provided.
+    (can be used to write any dictionary as a json file)
 
     '''
     with open(file_name,'w') as f:
         json.dump(params,f)
+
+def load_model_hyper_params(file_name:str):
+    '''
+    Loads hyperparameters from the file at the path provided.
+    (can be used to load any json file)
+
+    '''
+    with open(file_name,'r') as f:
+        return json.load(f)
 
 def optuna_tune_and_train_darts(model_class,
                                 train_target, val_target, train_exo, val_exo,

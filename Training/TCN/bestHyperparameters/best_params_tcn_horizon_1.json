@@ -1,1 +1,1 @@
-{"input_chunk_length": 36, "kernel_size": 8, "num_filters": 8, "num_layers": 2, "dilation_base": 5, "weight_norm": true, "dropout": 0.16013879441430584, "lr": 0.008054152920957363, "loss_fn": "MSE"}
+{"kernel_size": 1, "num_filters": 6, "num_layers": 8, "dilation_base": 3, "weight_norm": false, "dropout": 0.3896277927058858, "lr": 0.0014700343798593634, "loss_fn": "QuantileRegression", "input_chunk_length": 21}
