@@ -1,0 +1,1 @@
+{"kernel_size": 2, "num_filters": 6, "num_layers": 8, "dilation_base": 1, "weight_norm": false, "dropout": 0.12188933455136362, "lr": 0.0038383454446314713, "loss_fn": "MSE", "input_chunk_length": 22}
