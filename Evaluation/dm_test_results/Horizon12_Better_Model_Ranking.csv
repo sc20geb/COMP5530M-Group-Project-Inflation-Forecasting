@@ -1,0 +1,16 @@
+Rank,Model,Wins
+1,NHITS,15
+2,RFX,14
+3,VARcointegration,13
+4,VARccf,12
+5,Naive,11
+6,ARDL,10
+7,TCN,9
+8,MARS,8
+9,NBEATSx,7
+10,TFT,6
+11,Tide,5
+12,MLR,4
+13,RNN1990,3
+14,GRU1990,2
+15,LSTM,1
