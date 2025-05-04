@@ -366,12 +366,19 @@ def error_plot(predsDf:pd.DataFrame, model:str|list='all', absolute:bool=False, 
 
     # Plot all models:
     if model == 'all':
-        for model in predsDf.columns.drop('ground_truth'):
+        for model_ in predsDf.columns.drop('ground_truth'):
+
             # Take absolute val if specified:
             if absolute:
-                plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[model].to_numpy()- ground_truth), marker='o', label=model)
+                if model == 'Naive':
+                    plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[model_].to_numpy()- ground_truth), linestyle='--',marker='o', label=model_,alpha=0.4, linewidth=0.5)
+                else:
+                    plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[model_].to_numpy()- ground_truth), marker='o', label=model_, linewidth=1.5)
             else:
-                plt.plot(np.arange(0,len(predsDf.index)), predsDf[model].to_numpy()- ground_truth, marker='o', label=model)
+                if model == 'Naive':
+                    plt.plot(np.arange(0,len(predsDf.index)), predsDf[model_].to_numpy()- ground_truth, linestyle='--', marker='o', label=model_,alpha=0.4, linewidth=0.5)
+                else:
+                    plt.plot(np.arange(0,len(predsDf.index)), predsDf[model_].to_numpy()- ground_truth, marker='o', label=model_, linewidth=1.5)
             
         plt.legend()
 
@@ -380,9 +387,15 @@ def error_plot(predsDf:pd.DataFrame, model:str|list='all', absolute:bool=False, 
         for i in model:
             # Take absolute val if specified:
             if absolute:
-                plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[i].to_numpy()- ground_truth), marker='o', label=i)
+                if i == 'Naive':
+                    plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[i].to_numpy()- ground_truth), linestyle='--',marker='o', label=i,alpha=0.4, linewidth=0.5)
+                else:
+                    plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[i].to_numpy()- ground_truth), marker='o', label=i, linewidth=1.5)
             else:
-                plt.plot(np.arange(0,len(predsDf.index)), predsDf[i].to_numpy()- ground_truth, marker='o', label=i)
+                if i == 'Naive':
+                    plt.plot(np.arange(0,len(predsDf.index)), predsDf[i].to_numpy()- ground_truth, linestyle='--', marker='o', label=i,alpha=0.4, linewidth=0.5)
+                else:
+                    plt.plot(np.arange(0,len(predsDf.index)), predsDf[i].to_numpy()- ground_truth, marker='o', label=i, linewidth=1.5)
             
         plt.legend()
     
@@ -404,6 +417,7 @@ def error_plot(predsDf:pd.DataFrame, model:str|list='all', absolute:bool=False, 
     plt.grid()
     plt.ylabel('Error')
     plt.xlabel('dates')
+    plt.grid()
     plt.show()
 
 def plot_metric(metricsDf:pd.DataFrame,metric:str,model='all', title=None):
@@ -428,17 +442,20 @@ def plot_metric(metricsDf:pd.DataFrame,metric:str,model='all', title=None):
     if metric=='r2':
         metricsDf_cpy["r2"]= metricsDf_cpy["r2"].map(lambda x: x if x>=0 else 0)
 
+    fig, ax = plt.subplots()
     # plot the values
     if model == 'all':
-        plt.bar(metricsDf_cpy.index, metricsDf_cpy[metric])
+        bars=ax.bar(metricsDf_cpy.index, metricsDf_cpy[metric], label=metricsDf_cpy[metric].round(4))
         plt.xticks(range(0,metricsDf_cpy.shape[0]), metricsDf_cpy.index, rotation='vertical')
-        for i in range(0,metricsDf_cpy.shape[0]):
-            plt.text(i, metricsDf_cpy[metric].iloc[i] + 0.05, round(metricsDf_cpy[metric].iloc[i],4),ha='center')
+        ax.bar_label(bars,label_type='edge', rotation='vertical', padding=1.5)
+
     elif isinstance(model,list):
-        plt.bar(model, metricsDf_cpy.loc[model,metric])
+        bars=ax.bar(model, metricsDf_cpy.loc[model,metric], label=metricsDf_cpy.loc[model,metric].round(4))
         plt.xticks(range(0,len(model)), model, rotation='vertical')
-        for i in range(0, len(model)):
-            plt.text(i, metricsDf_cpy.loc[metricsDf_cpy.index[i],metric] + 0.05, round(metricsDf_cpy.loc[metricsDf_cpy.index[i],metric],4),ha='center')
+        
+        ax.bar_label(bars,label_type='edge', rotation='vertical', padding=1)
+
+        #plt.text(i, metricsDf_cpy.loc[metricsDf_cpy.index[i],metric] + 0.5*plt, round(metricsDf_cpy.loc[metricsDf_cpy.index[i],metric],4),ha='center', rotation='vertical')
     
 
     # plot optional title
