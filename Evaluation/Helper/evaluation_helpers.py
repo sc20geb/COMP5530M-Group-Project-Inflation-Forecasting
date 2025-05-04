@@ -17,34 +17,6 @@ project_root = os.path.abspath(os.path.join('..'))
 sys.path.append(project_root)
 
 from Training.Helper.dataPreprocessing import inverse_transform_target_features
-from Helper.DM_Test import dm_test
-def calculatePairDM(predictions:pd.DataFrame,loss = "MSE",h=1):
-    """Calculates the Diebold-Mariano Test
-
-    Args:
-        predictions (pd.DataFrame): DF of all predictions
-        loss (str, optional): Type of loss, MSE, MAD, MAPE, poly. Defaults to "MSE".
-        h (int,optional): Number of steps ahead 
-
-    Returns:
-        _type_: Far from zero big difference exists, close to zero- no meaningful difference. if P < 0.05 difference is statistically significant
-    """
-    groundTruth = predictions['ground_truth']
-    
-    models = predictions.columns.drop('ground_truth')
-    # Create an empty DataFrame for p-values
-    pval_df = pd.DataFrame(index=models, columns=models, dtype=float)
-
-    # Create an empty DataFrame for t-statistics if you want
-    dmstat_df = pd.DataFrame(index=models, columns=models, dtype=float)
-    
-    for model1, model2 in combinations(predictions.columns.drop('ground_truth'), 2):
-            dm_stat, p_val = dm_test(groundTruth,predictions[model1],predictions[model2],h=h,crit=loss)
-            
-            pval_df.loc[model1, model2] = p_val
-            dmstat_df.loc[model1, model2] = dm_stat
-    
-    return dmstat_df,pval_df
         
 def make_evaluation_predictions(model: torch.nn.Module, val_loader: torch.utils.data.DataLoader, savepath: str = '', device=None, y_scaler : BaseEstimator = None, y_scaler_features : list[str] = []):
     """
