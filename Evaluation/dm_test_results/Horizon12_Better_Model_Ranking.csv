@@ -1,6 +1,5 @@
 Rank,Model,Wins
-1,Naive,9
-2,No significant difference,3
-3,VARccf,1
-4,VARcointegration,1
-5,NHITS,1
+1,No significant difference,12
+2,VARccf,1
+3,VARcointegration,1
+4,NHITS,1
