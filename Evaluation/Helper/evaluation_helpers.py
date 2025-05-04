@@ -17,8 +17,6 @@ project_root = os.path.abspath(os.path.join('..'))
 sys.path.append(project_root)
 
 from Training.Helper.dataPreprocessing import inverse_transform_target_features
-from Helper.DM_Test import dm_test
-
         
 def make_evaluation_predictions(model: torch.nn.Module, val_loader: torch.utils.data.DataLoader, savepath: str = '', device=None, y_scaler : BaseEstimator = None, y_scaler_features : list[str] = []):
     """
