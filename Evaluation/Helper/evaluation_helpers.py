@@ -441,6 +441,9 @@ def plot_metric(metricsDf:pd.DataFrame,metric:str,model='all', title=None):
 
     if metric=='r2':
         metricsDf_cpy["r2"]= metricsDf_cpy["r2"].map(lambda x: x if x>=0 else 0)
+        metricsDf_cpy=metricsDf_cpy.sort_values(metric, axis=0,ascending=False)
+    else:
+        metricsDf_cpy=metricsDf_cpy.sort_values(metric, axis=0,ascending=True)
 
     fig, ax = plt.subplots()
     # plot the values
