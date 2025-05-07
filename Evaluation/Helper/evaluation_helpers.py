@@ -420,6 +420,88 @@ def error_plot(predsDf:pd.DataFrame, model:str|list='all', absolute:bool=False, 
     plt.grid()
     plt.show()
 
+
+def plot_preds(predsDf:pd.DataFrame,model_list:list,img_name,dpi=1200,figsize=(32.8/2.54,11.4/2.54), title:str=None):
+
+    colours=['gold','silver','deepskyblue','darkviolet','orange']
+    fig, ax= plt.subplots(dpi=dpi,figsize=figsize)
+    plt.rcParams['font.size']=9  
+    ax.plot(np.arange(0,len(predsDf.index)), predsDf.loc[:,'ground_truth'], marker='x', label='Ground Truth', linewidth=2,c='black')
+    ax.plot(np.arange(0,len(predsDf.index)), predsDf.loc[:,'Naive'], marker='o', label='Naive', alpha=0.5, linewidth=0.5, c='lime',linestyle='--')
+    count=0
+    for i in model_list:
+        ax.plot(np.arange(0,len(predsDf.index)), predsDf.loc[:,i], marker='o', label=i, linewidth=1.5,c=colours[count])
+        count+=1
+
+    ax.set_xticks(np.arange(0,len(predsDf.index)),['01/24','02/24','03/24','04/24','05/24','06/24','07/24','08/24','09/24','10/24','11/24','12/24'])
+    ax.set_ylabel(f'PCEPI forecasts')
+    ax.set_xlabel('Dates')
+    plt.legend()
+    plt.savefig(img_name, dpi=dpi,bbox_inches='tight')
+    plt.show()
+
+def combine_charts(predsDf:pd.DataFrame,metricsDf,img_name,n=3, absolute:bool=False, title:str=None,dpi=1200,figsize=(32.8/2.54,22/2.54), fontsize=9):
+    
+    colours=['gold','silver','deepskyblue','darkviolet','orange']#['gold','silver','darkgoldenrod','red','turquoise']
+    
+    ground_truth= predsDf['ground_truth'].to_numpy()
+    metricsDf_cpy=metricsDf.copy().sort_values('MAE', axis=0,ascending=True)
+    models= list(metricsDf_cpy.index.drop('Naive')[:n]) +['Naive']
+
+    fig, ax= plt.subplots(nrows=2, ncols=1,gridspec_kw={'height_ratios': [2,1.2]},dpi=dpi,figsize=figsize)#dpi=1200,figsize=(32.8/2.54,23/2.54)
+    plt.rcParams['font.size']=fontsize
+    # make the x -axis bold (represents the ground truth):
+    ax[0].axhline(linewidth=2, color='black',alpha=0.7)
+    ls=[]
+
+    for i in range(0,len(models)):
+            # Take absolute val if specified:
+        if absolute:
+            if models[i] == 'Naive':
+                l,=ax[0].plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[models[i]].to_numpy()- ground_truth), linestyle='--',marker='o', label=models[i],alpha=0.5, linewidth=0.5, c='lime')
+                ls.append(l)
+            else:
+                l=ax[0].plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[models[i]].to_numpy()- ground_truth), marker='o', label=models[i], linewidth=1.5,c=colours[i])
+                ls.append(l)
+        else:
+            if models[i] == 'Naive':
+                l,=ax[0].plot(np.arange(0,len(predsDf.index)), predsDf[models[i]].to_numpy()- ground_truth, linestyle='--', marker='o', label=models[i],alpha=0.5, linewidth=0.5,c='lime')
+                ls.append(l)
+            else:
+                l,=ax[0].plot(np.arange(0,len(predsDf.index)), predsDf[models[i]].to_numpy()- ground_truth, marker='o', label=models[i], linewidth=1.5,c=colours[i])
+                ls.append(l)
+            
+    
+    ax[0].set_xticks(np.arange(0,len(predsDf.index)),['01/24','02/24','03/24','04/24','05/24','06/24','07/24','08/24','09/24','10/24','11/24','12/24'])
+
+    if absolute:
+        ax[0].set_ylabel(f'Top {n} models Absolute Error')
+    else:
+        ax[0].set_ylabel(f'Top {n} models Error')
+    ax[0].set_xlabel('Dates')
+
+    bar_colours=['navy']* len(metricsDf_cpy.index)
+
+    for i in range(0, n):
+        bar_colours[i]= colours[i]
+    
+    bar_colours[metricsDf_cpy.index.get_loc('Naive')]='lime'
+    ax[1].set_ylim((0,10))
+    bars=ax[1].bar(metricsDf_cpy.index, metricsDf_cpy.loc[metricsDf_cpy.index,'MAE'].copy().apply(lambda x: x if x<10 else 10),color=bar_colours)
+    ax[1].set_xticks(range(0,len(metricsDf_cpy.index)), metricsDf_cpy.index, rotation='vertical')
+    ax[1].bar_label(bars,labels=metricsDf_cpy.loc[metricsDf_cpy.index,'MAE'].apply(lambda x: f"{x:.3g}"),label_type='edge', rotation='vertical', padding=2, fmt='{0:.3g}')
+    ax[1].set_ylabel('Mean Absolute Error')
+    ax[1].set_xlabel('Models')
+    ax[1].set_ylim((0,10))
+    ax[1].legend(ls,models[:n]+['Naive'], loc='upper left',ncols=3)
+    if title is not None:
+        fig.suptitle(title)
+
+
+    plt.subplots_adjust(hspace=0.4)
+    plt.savefig(img_name, dpi=dpi,bbox_inches='tight')
+    plt.show()
+
 def plot_metric(metricsDf:pd.DataFrame,metric:str,model='all', title=None):
 
     '''
