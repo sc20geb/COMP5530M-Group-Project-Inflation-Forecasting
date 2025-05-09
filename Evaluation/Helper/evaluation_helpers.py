@@ -366,12 +366,19 @@ def error_plot(predsDf:pd.DataFrame, model:str|list='all', absolute:bool=False, 
 
     # Plot all models:
     if model == 'all':
-        for model in predsDf.columns.drop('ground_truth'):
+        for model_ in predsDf.columns.drop('ground_truth'):
+
             # Take absolute val if specified:
             if absolute:
-                plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[model].to_numpy()- ground_truth), marker='o', label=model)
+                if model == 'Naive':
+                    plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[model_].to_numpy()- ground_truth), linestyle='--',marker='o', label=model_,alpha=0.4, linewidth=0.5)
+                else:
+                    plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[model_].to_numpy()- ground_truth), marker='o', label=model_, linewidth=1.5)
             else:
-                plt.plot(np.arange(0,len(predsDf.index)), predsDf[model].to_numpy()- ground_truth, marker='o', label=model)
+                if model == 'Naive':
+                    plt.plot(np.arange(0,len(predsDf.index)), predsDf[model_].to_numpy()- ground_truth, linestyle='--', marker='o', label=model_,alpha=0.4, linewidth=0.5)
+                else:
+                    plt.plot(np.arange(0,len(predsDf.index)), predsDf[model_].to_numpy()- ground_truth, marker='o', label=model_, linewidth=1.5)
             
         plt.legend()
 
@@ -380,9 +387,15 @@ def error_plot(predsDf:pd.DataFrame, model:str|list='all', absolute:bool=False, 
         for i in model:
             # Take absolute val if specified:
             if absolute:
-                plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[i].to_numpy()- ground_truth), marker='o', label=i)
+                if i == 'Naive':
+                    plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[i].to_numpy()- ground_truth), linestyle='--',marker='o', label=i,alpha=0.4, linewidth=0.5)
+                else:
+                    plt.plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[i].to_numpy()- ground_truth), marker='o', label=i, linewidth=1.5)
             else:
-                plt.plot(np.arange(0,len(predsDf.index)), predsDf[i].to_numpy()- ground_truth, marker='o', label=i)
+                if i == 'Naive':
+                    plt.plot(np.arange(0,len(predsDf.index)), predsDf[i].to_numpy()- ground_truth, linestyle='--', marker='o', label=i,alpha=0.4, linewidth=0.5)
+                else:
+                    plt.plot(np.arange(0,len(predsDf.index)), predsDf[i].to_numpy()- ground_truth, marker='o', label=i, linewidth=1.5)
             
         plt.legend()
     
@@ -404,6 +417,93 @@ def error_plot(predsDf:pd.DataFrame, model:str|list='all', absolute:bool=False, 
     plt.grid()
     plt.ylabel('Error')
     plt.xlabel('dates')
+    plt.grid()
+    plt.show()
+
+
+def plot_preds(predsDf:pd.DataFrame,model_list:list,img_name,dpi=1200,figsize=(32.8/2.54,11.4/2.54), title:str=None, fontsize=9):
+
+    colours=['gold','silver','deepskyblue','darkviolet','orange']
+    fig, ax= plt.subplots(dpi=dpi,figsize=figsize)
+    plt.rcParams['font.size']=fontsize  
+    ax.plot(np.arange(0,len(predsDf.index)), predsDf.loc[:,'ground_truth'], marker='x', label='Ground Truth', linewidth=2,c='black')
+    ax.plot(np.arange(0,len(predsDf.index)), predsDf.loc[:,'Naive'], marker='o', label='Naive', alpha=0.5, linewidth=0.5, c='lime',linestyle='--')
+    count=0
+    for i in model_list:
+        ax.plot(np.arange(0,len(predsDf.index)), predsDf.loc[:,i], marker='o', label=i, linewidth=1.5,c=colours[count])
+        count+=1
+
+    ax.set_xticks(np.arange(0,len(predsDf.index)),['01/24','02/24','03/24','04/24','05/24','06/24','07/24','08/24','09/24','10/24','11/24','12/24'])
+    ax.set_ylabel(f'PCEPI forecasts')
+    ax.set_xlabel('Dates')
+
+    if title is not None:
+        fig.suptitle(title,weight='bold')
+
+    plt.legend()
+    plt.savefig(img_name, dpi=dpi,bbox_inches='tight')
+    plt.show()
+
+def combine_charts(predsDf:pd.DataFrame,metricsDf,img_name,n=3, absolute:bool=False, title:str=None,dpi=1200,figsize=(32.8/2.54,22/2.54), fontsize=9):
+    
+    colours=['gold','silver','deepskyblue','darkviolet','orange']#['gold','silver','darkgoldenrod','red','turquoise']
+    
+    ground_truth= predsDf['ground_truth'].to_numpy()
+    metricsDf_cpy=metricsDf.copy().sort_values('MAE', axis=0,ascending=True)
+    models= list(metricsDf_cpy.index.drop('Naive')[:n]) +['Naive']
+
+    fig, ax= plt.subplots(nrows=1, ncols=2,gridspec_kw={'width_ratios': (2,1.5)},dpi=dpi,figsize=figsize)#dpi=1200,figsize=(32.8/2.54,23/2.54)
+    plt.rcParams['font.size']=fontsize
+    # make the x -axis bold (represents the ground truth):
+    ax[0].axhline(linewidth=2, color='black',alpha=0.7)
+    ls=[]
+
+    for i in range(0,len(models)):
+            # Take absolute val if specified:
+        if absolute:
+            if models[i] == 'Naive':
+                l,=ax[0].plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[models[i]].to_numpy()- ground_truth), linestyle='--',marker='o', label=models[i],alpha=0.5, linewidth=0.5, c='lime')
+                ls.append(l)
+            else:
+                l=ax[0].plot(np.arange(0,len(predsDf.index)), np.abs(predsDf[models[i]].to_numpy()- ground_truth), marker='o', label=models[i], linewidth=1.5,c=colours[i])
+                ls.append(l)
+        else:
+            if models[i] == 'Naive':
+                l,=ax[0].plot(np.arange(0,len(predsDf.index)), predsDf[models[i]].to_numpy()- ground_truth, linestyle='--', marker='o', label=models[i],alpha=0.5, linewidth=0.5,c='lime')
+                ls.append(l)
+            else:
+                l,=ax[0].plot(np.arange(0,len(predsDf.index)), predsDf[models[i]].to_numpy()- ground_truth, marker='o', label=models[i], linewidth=1.5,c=colours[i])
+                ls.append(l)
+            
+    
+    ax[0].set_xticks(np.arange(0,len(predsDf.index)),['01','02','03','04','05','06','07','08','09','10','11','12'])#['01/24','02/24','03/24','04/24','05/24','06/24','07/24','08/24','09/24','10/24','11/24','12/24']
+
+    if absolute:
+        ax[0].set_ylabel(f'Top {n} models Absolute Error',y=0.4)
+    else:
+        ax[0].set_ylabel(f'Top {n} models Error',y=0.4)
+    ax[0].set_xlabel('Dates (2024)')
+
+    bar_colours=['navy']* len(metricsDf_cpy.index)
+
+    for i in range(0, n):
+        bar_colours[i]= colours[i]
+    
+    bar_colours[metricsDf_cpy.index.get_loc('Naive')]='lime'
+    ax[1].set_ylim((0,10))
+    bars=ax[1].bar(metricsDf_cpy.index, metricsDf_cpy.loc[metricsDf_cpy.index,'MAE'].copy().apply(lambda x: x if x<10 else 10),color=bar_colours)
+    ax[1].set_xticks(range(0,len(metricsDf_cpy.index)), metricsDf_cpy.index, rotation='vertical', fontsize=fontsize)
+    ax[1].bar_label(bars,labels=metricsDf_cpy.loc[metricsDf_cpy.index,'MAE'].apply(lambda x: f"{x:.3g}"),label_type='edge', rotation='vertical', padding=2, fmt='{0:.3g}')
+    ax[1].set_ylabel('Mean Absolute Error',y=0.4)
+    ax[1].set_xlabel('Models')
+    ax[1].set_ylim((0,10))
+    ax[0].legend(ls,models[:n]+['Naive'], loc='upper left', ncols=4,bbox_to_anchor=(-0.21,-0.3), fontsize=fontsize)
+    if title is not None:
+        fig.suptitle(title,weight='bold',y=1.03)
+
+
+    plt.subplots_adjust(hspace=0.4)
+    plt.savefig(img_name, dpi=dpi,bbox_inches='tight')
     plt.show()
 
 def plot_metric(metricsDf:pd.DataFrame,metric:str,model='all', title=None):
@@ -427,18 +527,24 @@ def plot_metric(metricsDf:pd.DataFrame,metric:str,model='all', title=None):
 
     if metric=='r2':
         metricsDf_cpy["r2"]= metricsDf_cpy["r2"].map(lambda x: x if x>=0 else 0)
+        metricsDf_cpy=metricsDf_cpy.sort_values(metric, axis=0,ascending=False)
+    else:
+        metricsDf_cpy=metricsDf_cpy.sort_values(metric, axis=0,ascending=True)
 
+    fig, ax = plt.subplots()
     # plot the values
     if model == 'all':
-        plt.bar(metricsDf_cpy.index, metricsDf_cpy[metric])
+        bars=ax.bar(metricsDf_cpy.index, metricsDf_cpy[metric], label=metricsDf_cpy[metric].round(4))
         plt.xticks(range(0,metricsDf_cpy.shape[0]), metricsDf_cpy.index, rotation='vertical')
-        for i in range(0,metricsDf_cpy.shape[0]):
-            plt.text(i, metricsDf_cpy[metric].iloc[i] + 0.05, round(metricsDf_cpy[metric].iloc[i],4),ha='center')
+        ax.bar_label(bars,label_type='edge', rotation='vertical', padding=1.5)
+
     elif isinstance(model,list):
-        plt.bar(model, metricsDf_cpy.loc[model,metric])
+        bars=ax.bar(model, metricsDf_cpy.loc[model,metric], label=metricsDf_cpy.loc[model,metric].round(4))
         plt.xticks(range(0,len(model)), model, rotation='vertical')
-        for i in range(0, len(model)):
-            plt.text(i, metricsDf_cpy.loc[metricsDf_cpy.index[i],metric] + 0.05, round(metricsDf_cpy.loc[metricsDf_cpy.index[i],metric],4),ha='center')
+        
+        ax.bar_label(bars,label_type='edge', rotation='vertical', padding=1)
+
+        #plt.text(i, metricsDf_cpy.loc[metricsDf_cpy.index[i],metric] + 0.5*plt, round(metricsDf_cpy.loc[metricsDf_cpy.index[i],metric],4),ha='center', rotation='vertical')
     
 
     # plot optional title
