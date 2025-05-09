@@ -421,11 +421,11 @@ def error_plot(predsDf:pd.DataFrame, model:str|list='all', absolute:bool=False, 
     plt.show()
 
 
-def plot_preds(predsDf:pd.DataFrame,model_list:list,img_name,dpi=1200,figsize=(32.8/2.54,11.4/2.54), title:str=None):
+def plot_preds(predsDf:pd.DataFrame,model_list:list,img_name,dpi=1200,figsize=(32.8/2.54,11.4/2.54), title:str=None, fontsize=9):
 
     colours=['gold','silver','deepskyblue','darkviolet','orange']
     fig, ax= plt.subplots(dpi=dpi,figsize=figsize)
-    plt.rcParams['font.size']=9  
+    plt.rcParams['font.size']=fontsize  
     ax.plot(np.arange(0,len(predsDf.index)), predsDf.loc[:,'ground_truth'], marker='x', label='Ground Truth', linewidth=2,c='black')
     ax.plot(np.arange(0,len(predsDf.index)), predsDf.loc[:,'Naive'], marker='o', label='Naive', alpha=0.5, linewidth=0.5, c='lime',linestyle='--')
     count=0
@@ -436,6 +436,10 @@ def plot_preds(predsDf:pd.DataFrame,model_list:list,img_name,dpi=1200,figsize=(3
     ax.set_xticks(np.arange(0,len(predsDf.index)),['01/24','02/24','03/24','04/24','05/24','06/24','07/24','08/24','09/24','10/24','11/24','12/24'])
     ax.set_ylabel(f'PCEPI forecasts')
     ax.set_xlabel('Dates')
+
+    if title is not None:
+        fig.suptitle(title,weight='bold')
+
     plt.legend()
     plt.savefig(img_name, dpi=dpi,bbox_inches='tight')
     plt.show()
@@ -448,7 +452,7 @@ def combine_charts(predsDf:pd.DataFrame,metricsDf,img_name,n=3, absolute:bool=Fa
     metricsDf_cpy=metricsDf.copy().sort_values('MAE', axis=0,ascending=True)
     models= list(metricsDf_cpy.index.drop('Naive')[:n]) +['Naive']
 
-    fig, ax= plt.subplots(nrows=2, ncols=1,gridspec_kw={'height_ratios': [2,1.2]},dpi=dpi,figsize=figsize)#dpi=1200,figsize=(32.8/2.54,23/2.54)
+    fig, ax= plt.subplots(nrows=1, ncols=2,gridspec_kw={'width_ratios': (2,1.5)},dpi=dpi,figsize=figsize)#dpi=1200,figsize=(32.8/2.54,23/2.54)
     plt.rcParams['font.size']=fontsize
     # make the x -axis bold (represents the ground truth):
     ax[0].axhline(linewidth=2, color='black',alpha=0.7)
@@ -472,13 +476,13 @@ def combine_charts(predsDf:pd.DataFrame,metricsDf,img_name,n=3, absolute:bool=Fa
                 ls.append(l)
             
     
-    ax[0].set_xticks(np.arange(0,len(predsDf.index)),['01/24','02/24','03/24','04/24','05/24','06/24','07/24','08/24','09/24','10/24','11/24','12/24'])
+    ax[0].set_xticks(np.arange(0,len(predsDf.index)),['01','02','03','04','05','06','07','08','09','10','11','12'])#['01/24','02/24','03/24','04/24','05/24','06/24','07/24','08/24','09/24','10/24','11/24','12/24']
 
     if absolute:
-        ax[0].set_ylabel(f'Top {n} models Absolute Error')
+        ax[0].set_ylabel(f'Top {n} models Absolute Error',y=0.4)
     else:
-        ax[0].set_ylabel(f'Top {n} models Error')
-    ax[0].set_xlabel('Dates')
+        ax[0].set_ylabel(f'Top {n} models Error',y=0.4)
+    ax[0].set_xlabel('Dates (2024)')
 
     bar_colours=['navy']* len(metricsDf_cpy.index)
 
@@ -488,14 +492,14 @@ def combine_charts(predsDf:pd.DataFrame,metricsDf,img_name,n=3, absolute:bool=Fa
     bar_colours[metricsDf_cpy.index.get_loc('Naive')]='lime'
     ax[1].set_ylim((0,10))
     bars=ax[1].bar(metricsDf_cpy.index, metricsDf_cpy.loc[metricsDf_cpy.index,'MAE'].copy().apply(lambda x: x if x<10 else 10),color=bar_colours)
-    ax[1].set_xticks(range(0,len(metricsDf_cpy.index)), metricsDf_cpy.index, rotation='vertical')
+    ax[1].set_xticks(range(0,len(metricsDf_cpy.index)), metricsDf_cpy.index, rotation='vertical', fontsize=fontsize)
     ax[1].bar_label(bars,labels=metricsDf_cpy.loc[metricsDf_cpy.index,'MAE'].apply(lambda x: f"{x:.3g}"),label_type='edge', rotation='vertical', padding=2, fmt='{0:.3g}')
-    ax[1].set_ylabel('Mean Absolute Error')
+    ax[1].set_ylabel('Mean Absolute Error',y=0.4)
     ax[1].set_xlabel('Models')
     ax[1].set_ylim((0,10))
-    ax[1].legend(ls,models[:n]+['Naive'], loc='upper left',ncols=3)
+    ax[0].legend(ls,models[:n]+['Naive'], loc='upper left', ncols=4,bbox_to_anchor=(-0.21,-0.3), fontsize=fontsize)
     if title is not None:
-        fig.suptitle(title)
+        fig.suptitle(title,weight='bold',y=1.03)
 
 
     plt.subplots_adjust(hspace=0.4)
